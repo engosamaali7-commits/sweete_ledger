@@ -1,0 +1,36 @@
+name: sweets_ledger
+description: دفتر إلكتروني لإدارة مبيعات الحلويات والسمبوسة عبر المحافظ
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+
+  # للتخزين المحلي
+  sqflite: ^2.3.0
+  path: ^1.8.3
+  path_provider: ^2.1.1
+
+  # للتنسيق والتواريخ
+  intl: ^0.19.0
+
+  # للمشاركة والتصدير
+  share_plus: ^7.2.1
+
+  # للطباعة
+  printing: ^5.11.1
+  pdf: ^3.10.7
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.1
+
+flutter:
+  uses-material-design: true
