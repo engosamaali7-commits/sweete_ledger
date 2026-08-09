@@ -21,6 +21,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   final DatabaseHelper _dbHelper = DatabaseHelper();
   int _currentIndex = 0;
+  Map<String, dynamic> _stats = {};
   double _totalToday = 0;
   double _totalSambousa = 0;
   double _totalSweets = 0;
@@ -46,6 +47,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
     if (mounted) {
       setState(() {
+        _stats = stats;
         _totalToday = (stats['total'] as num?)?.toDouble() ?? 0;
         _totalSambousa = (stats['sambousa'] as num?)?.toDouble() ?? 0;
         _totalSweets = (stats['sweets'] as num?)?.toDouble() ?? 0;
@@ -188,13 +190,15 @@ class _HomeScreenState extends State<HomeScreen> {
   // ================ DASHBOARD ================
   Widget _buildDashboard(AppLocalizations l10n) {
     final theme = Theme.of(context);
+    final categoryStats = (_stats['category_stats'] as List<dynamic>?)
+        ?.map((e) => e as Map<String, dynamic>)
+        .toList() ?? [];
 
     return RefreshIndicator(
       onRefresh: _loadTodayData,
       child: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          // بطاقات الملخص
           Row(
             children: [
               Expanded(
@@ -208,87 +212,50 @@ class _HomeScreenState extends State<HomeScreen> {
               const SizedBox(width: 8),
               Expanded(
                 child: _buildSummaryCard(
-                  l10n.getString('sambousa'),
-                  _formatCurrency(_totalSambousa),
-                  Icons.fastfood,
-                  Colors.orange,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              Expanded(
-                child: _buildSummaryCard(
-                  l10n.getString('sweets'),
-                  _formatCurrency(_totalSweets),
-                  Icons.cake,
-                  Colors.pink,
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: _buildSummaryCard(
-                  l10n.getString('other'),
-                  _formatCurrency(_totalCustom),
-                  Icons.more_horiz,
-                  Colors.teal,
+                  l10n.getString('operations_count'),
+                  '$_transactionCount',
+                  Icons.receipt_long,
+                  Colors.blue,
                 ),
               ),
             ],
           ),
           const SizedBox(height: 12),
 
-          // عدد العمليات
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(Icons.receipt_long, color: Colors.blue),
-                  const SizedBox(width: 8),
-                  Text(
-                    '${l10n.getString('operations_count')}: $_transactionCount',
-                    style: theme.textTheme.titleMedium,
-                  ),
-                ],
-              ),
-            ),
-          ),
-
-          // عرض العمليات المخصصة
-          if (_customStats.isNotEmpty) ...[
-            const SizedBox(height: 12),
+          if (categoryStats.isNotEmpty) ...[
             Card(
               child: Padding(
                 padding: const EdgeInsets.all(16),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(l10n.getString('other'),
-                        style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+                    Text('أنواع العمليات', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
                     const SizedBox(height: 8),
-                    ..._customStats.map((stat) => Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 4),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Row(
-                            children: [
-                              const Icon(Icons.circle, size: 8, color: Colors.teal),
-                              const SizedBox(width: 8),
-                              Text(stat['custom_name'] ?? ''),
-                            ],
-                          ),
-                          Text(
-                            _formatCurrency((stat['total'] as num?)?.toDouble() ?? 0),
-                            style: const TextStyle(fontWeight: FontWeight.bold),
-                          ),
-                        ],
-                      ),
-                    )),
+                    ...categoryStats.asMap().entries.map((entry) {
+                      final index = entry.key;
+                      final stat = entry.value;
+                      final colors = [Colors.orange, Colors.pink, Colors.teal, Colors.blue, Colors.purple, Colors.green];
+                      final color = colors[index % colors.length];
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 4),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Row(
+                              children: [
+                                Icon(Icons.circle, size: 8, color: color),
+                                const SizedBox(width: 8),
+                                Text(stat['category_name'] ?? ''),
+                              ],
+                            ),
+                            Text(
+                              _formatCurrency((stat['total'] as num?)?.toDouble() ?? 0),
+                              style: const TextStyle(fontWeight: FontWeight.bold),
+                            ),
+                          ],
+                        ),
+                      );
+                    }),
                   ],
                 ),
               ),
@@ -297,7 +264,6 @@ class _HomeScreenState extends State<HomeScreen> {
 
           const SizedBox(height: 20),
 
-          // أداء المحافظ
           Text(l10n.getString('wallet_performance'),
               style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
           const SizedBox(height: 8),

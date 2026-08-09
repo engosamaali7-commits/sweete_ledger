@@ -18,22 +18,47 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
   final _customNameController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
 
-  String? _selectedCategory;
+  int? _selectedCategoryId;
+  String? _selectedCategoryName;
   int? _selectedWalletId;
+  List<Map<String, dynamic>> _categories = [];
   List<Map<String, dynamic>> _wallets = [];
   bool _isLoading = false;
+  bool _isCustom = false;
 
   @override
   void initState() {
     super.initState();
-    _loadWallets();
+    _loadData();
   }
 
-  Future<void> _loadWallets() async {
+  Future<void> _loadData() async {
+    final categories = await _dbHelper.getActiveCategories();
     final wallets = await _dbHelper.getActiveWallets();
-    setState(() {
-      _wallets = wallets;
-    });
+    if (mounted) {
+      setState(() {
+        _categories = categories;
+        _wallets = wallets;
+      });
+    }
+  }
+
+  IconData _getIconData(String iconName) {
+    switch (iconName) {
+      case 'fastfood': return Icons.fastfood;
+      case 'cake': return Icons.cake;
+      case 'local_grocery_store': return Icons.local_grocery_store;
+      case 'local_drink': return Icons.local_drink;
+      case 'shopping_bag': return Icons.shopping_bag;
+      case 'build': return Icons.build;
+      case 'handyman': return Icons.handyman;
+      default: return Icons.category;
+    }
+  }
+
+  Color _getCategoryColor(int index) {
+    final colors = [Colors.orange, Colors.pink, Colors.teal, Colors.blue, Colors.purple, Colors.green, Colors.red, Colors.amber];
+    return colors[index % colors.length];
   }
 
   Future<void> _saveTransaction() async {
@@ -45,11 +70,19 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
       final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
       final recordId = await _dbHelper.createDailyRecordIfNotExists(today);
 
+      String categoryName;
+      if (_isCustom) {
+        categoryName = _customNameController.text.trim();
+      } else {
+        categoryName = _selectedCategoryName ?? '';
+      }
+
       await _dbHelper.addTransaction(
         dailyRecordId: recordId,
         walletId: _selectedWalletId!,
-        category: _selectedCategory!,
-        customName: _selectedCategory == 'custom' ? _customNameController.text.trim() : null,
+        categoryId: _isCustom ? null : _selectedCategoryId,
+        categoryName: categoryName,
+        customName: _isCustom ? _customNameController.text.trim() : null,
         amount: double.parse(_amountController.text),
         note: _noteController.text.isNotEmpty ? _noteController.text : null,
       );
@@ -68,14 +101,11 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('حدث خطأ: $e'),
-            backgroundColor: Colors.red,
-          ),
+          SnackBar(content: Text('حدث خطأ: $e'), backgroundColor: Colors.red),
         );
       }
     } finally {
-      setState(() => _isLoading = false);
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -85,9 +115,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
     final theme = Theme.of(context);
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(l10n.getString('add_transaction')),
-      ),
+      appBar: AppBar(title: Text(l10n.getString('add_transaction'))),
       body: Form(
         key: _formKey,
         child: SingleChildScrollView(
@@ -95,42 +123,82 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // نوع العملية
               Text(l10n.getString('category'), style: theme.textTheme.titleMedium),
               const SizedBox(height: 12),
-              Row(
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
                 children: [
-                  Expanded(
-                    child: _buildCategoryCard(
-                      l10n.getString('sambousa'),
-                      Icons.fastfood,
-                      Colors.orange,
-                      'sambousa',
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: _buildCategoryCard(
-                      l10n.getString('sweets'),
-                      Icons.cake,
-                      Colors.pink,
-                      'sweets',
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: _buildCategoryCard(
-                      l10n.getString('other'),
-                      Icons.more_horiz,
-                      Colors.teal,
-                      'custom',
+                  ..._categories.asMap().entries.map((entry) {
+                    final index = entry.key;
+                    final cat = entry.value;
+                    final isSelected = _selectedCategoryId == cat['id'] && !_isCustom;
+                    final color = _getCategoryColor(index);
+                    final icon = _getIconData(cat['icon_name'] as String? ?? 'category');
+
+                    return GestureDetector(
+                      onTap: () {
+                        setState(() {
+                          _selectedCategoryId = cat['id'] as int;
+                          _selectedCategoryName = cat['name'] as String;
+                          _isCustom = false;
+                          _customNameController.clear();
+                        });
+                      },
+                      child: Card(
+                        elevation: isSelected ? 4 : 1,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          side: BorderSide(color: isSelected ? color : Colors.transparent, width: 2),
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.all(12),
+                          child: Column(
+                            children: [
+                              Icon(icon, color: color, size: 32),
+                              const SizedBox(height: 4),
+                              Text(cat['name'] as String, style: TextStyle(
+                                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                color: isSelected ? color : null,
+                                fontSize: 12,
+                              )),
+                            ],
+                          ),
+                        ),
+                      ),
+                    );
+                  }),
+                  // زر عملية مخصصة
+                  GestureDetector(
+                    onTap: () {
+                      setState(() {
+                        _isCustom = true;
+                        _selectedCategoryId = null;
+                        _selectedCategoryName = null;
+                      });
+                    },
+                    child: Card(
+                      elevation: _isCustom ? 4 : 1,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        side: BorderSide(color: _isCustom ? Colors.grey : Colors.transparent, width: 2),
+                      ),
+                      child: const Padding(
+                        padding: EdgeInsets.all(12),
+                        child: Column(
+                          children: [
+                            Icon(Icons.edit_note, color: Colors.grey, size: 32),
+                            SizedBox(height: 4),
+                            Text('أخرى', style: TextStyle(fontSize: 12)),
+                          ],
+                        ),
+                      ),
                     ),
                   ),
                 ],
               ),
 
-              // حقل اسم العملية المخصصة
-              if (_selectedCategory == 'custom') ...[
+              if (_isCustom) ...[
                 const SizedBox(height: 24),
                 Text(l10n.getString('custom_name'), style: theme.textTheme.titleMedium),
                 const SizedBox(height: 12),
@@ -142,9 +210,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                     hintText: l10n.getString('custom_name'),
                   ),
                   validator: (value) {
-                    if (value == null || value.trim().isEmpty) {
-                      return l10n.getString('custom_name_required');
-                    }
+                    if (value == null || value.trim().isEmpty) return l10n.getString('custom_name_required');
                     return null;
                   },
                 ),
@@ -152,7 +218,6 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
 
               const SizedBox(height: 24),
 
-              // اختيار المحفظة
               Text(l10n.getString('wallet'), style: theme.textTheme.titleMedium),
               const SizedBox(height: 12),
               DropdownButtonFormField<int>(
@@ -161,23 +226,15 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                   prefixIcon: const Icon(Icons.account_balance_wallet),
                   hintText: l10n.getString('select_wallet'),
                 ),
-                items: _wallets.map((w) {
-                  return DropdownMenuItem<int>(
-                    value: w['id'] as int,
-                    child: Text(w['name'] as String),
-                  );
-                }).toList(),
-                onChanged: (value) {
-                  setState(() => _selectedWalletId = value);
-                },
-                validator: (value) {
-                  if (value == null) return l10n.getString('wallet_required');
-                  return null;
-                },
+                items: _wallets.map((w) => DropdownMenuItem<int>(
+                  value: w['id'] as int,
+                  child: Text(w['name'] as String),
+                )).toList(),
+                onChanged: (value) => setState(() => _selectedWalletId = value),
+                validator: (value) => value == null ? l10n.getString('wallet_required') : null,
               ),
               const SizedBox(height: 24),
 
-              // المبلغ
               Text(l10n.getString('amount'), style: theme.textTheme.titleMedium),
               const SizedBox(height: 12),
               TextFormField(
@@ -190,21 +247,15 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                   suffixText: 'ريال',
                 ),
                 validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return l10n.getString('amount_required');
-                  }
+                  if (value == null || value.isEmpty) return l10n.getString('amount_required');
                   final amount = double.tryParse(value);
-                  if (amount == null || amount <= 0) {
-                    return l10n.getString('amount_positive');
-                  }
+                  if (amount == null || amount <= 0) return l10n.getString('amount_positive');
                   return null;
                 },
               ),
               const SizedBox(height: 24),
 
-              // ملاحظات
-              Text('${l10n.getString('note')} (${l10n.getString('optional')})',
-                  style: theme.textTheme.titleMedium),
+              Text('${l10n.getString('note')} (${l10n.getString('optional')})', style: theme.textTheme.titleMedium),
               const SizedBox(height: 12),
               TextFormField(
                 controller: _noteController,
@@ -217,67 +268,13 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
               ),
               const SizedBox(height: 32),
 
-              // زر الحفظ
               FilledButton.icon(
                 onPressed: _isLoading ? null : _saveTransaction,
                 icon: _isLoading
-                    ? const SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(
-                      strokeWidth: 2, color: Colors.white),
-                )
+                    ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                     : const Icon(Icons.save),
-                label: Text(_isLoading
-                    ? l10n.getString('saving')
-                    : l10n.getString('save')),
-                style: FilledButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildCategoryCard(
-      String label, IconData icon, Color color, String value) {
-    final isSelected = _selectedCategory == value;
-
-    return GestureDetector(
-      onTap: () {
-        setState(() {
-          _selectedCategory = value;
-          if (value != 'custom') {
-            _customNameController.clear();
-          }
-        });
-      },
-      child: Card(
-        elevation: isSelected ? 4 : 1,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-          side: BorderSide(
-            color: isSelected ? color : Colors.transparent,
-            width: 2,
-          ),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Column(
-            children: [
-              Icon(icon, color: color, size: 32),
-              const SizedBox(height: 4),
-              Text(
-                label,
-                style: TextStyle(
-                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                  color: isSelected ? color : null,
-                  fontSize: 12,
-                ),
-                textAlign: TextAlign.center,
+                label: Text(_isLoading ? l10n.getString('saving') : l10n.getString('save')),
+                style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16)),
               ),
             ],
           ),

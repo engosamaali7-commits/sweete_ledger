@@ -23,6 +23,8 @@ class AboutScreen extends StatelessWidget {
     final uri = Uri.parse('https://wa.me/$phone');
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } else {
+      await _openUrl('https://wa.me/$phone');
     }
   }
 
@@ -55,12 +57,12 @@ class AboutScreen extends StatelessWidget {
             ),
             const SizedBox(height: 16),
             Text(
-              l10n.getString('app_title'),
+              'مدير المحافظ',
               style: theme.textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
             Text(
-              l10n.getString('app_description'),
+              'مدير العمليات والمحافظ الإلكترونية',
               textAlign: TextAlign.center,
               style: theme.textTheme.bodyMedium?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
@@ -100,7 +102,7 @@ class AboutScreen extends StatelessWidget {
                             () => _openUrl('https://whatsapp.com/channel/0029Vb5lkNCKmCPSvOoUOz0M')),
                     const SizedBox(height: 8),
                     _buildContactButton(Icons.code, l10n.getString('github'),
-                            () => _openUrl('https://github.com/engosamaali7-commits')),
+                            () => _openUrl('https://github.com/engosamaali7-commits/OQ-Developer')),
                   ],
                 ),
               ),

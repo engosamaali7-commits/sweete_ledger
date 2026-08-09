@@ -1,5 +1,5 @@
 name: sweets_ledger
-description: دفتر إلكتروني لإدارة مبيعات الحلويات والسمبوسة عبر المحافظ
+description: مدير العمليات والمحافظ الإلكترونية
 publish_to: 'none'
 version: 1.0.0+1
 
@@ -21,7 +21,6 @@ dependencies:
   pdf: ^3.10.7
   url_launcher: ^6.2.2
   shared_preferences: ^2.2.2
-  open_file: ^3.3.2          # لفتح ملفات PDF
 
 dev_dependencies:
   flutter_test:
@@ -30,3 +29,6 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+
+  assets:
+    - assets/fonts/
