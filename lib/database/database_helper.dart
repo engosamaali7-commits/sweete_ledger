@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 
 class DatabaseHelper {
   static Database? _database;
+  static const int _dbVersion = 3;
 
   Future<Database> get database async {
     if (_database != null) return _database!;
@@ -18,14 +19,13 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 2,  // ← غيّر الإصدار إلى 2
+      version: _dbVersion,
       onCreate: _onCreate,
-      onUpgrade: _onUpgrade,  // ← أضف هذا
+      onUpgrade: _onUpgrade,
     );
   }
 
   Future<void> _onCreate(Database db, int version) async {
-    // جدول المحافظ
     await db.execute('''
       CREATE TABLE wallets (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -35,18 +35,17 @@ class DatabaseHelper {
       )
     ''');
 
-    // جدول السجلات اليومية
     await db.execute('''
       CREATE TABLE daily_records (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         business_date TEXT NOT NULL UNIQUE,
         status TEXT DEFAULT 'open',
+        is_archived INTEGER DEFAULT 0,
         created_at TEXT DEFAULT CURRENT_TIMESTAMP,
         closed_at TEXT
       )
     ''');
 
-    // جدول العمليات - مع custom_name
     await db.execute('''
       CREATE TABLE transactions (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -62,21 +61,21 @@ class DatabaseHelper {
       )
     ''');
 
-    // إضافة محافظ افتراضية
     await db.insert('wallets', {'name': 'محفظة ١'});
     await db.insert('wallets', {'name': 'محفظة ٢'});
     await db.insert('wallets', {'name': 'محفظة ٣'});
   }
 
-  // ============ UPGRADE للإصدار 2 ============
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
     if (oldVersion < 2) {
-      // إضافة عمود custom_name إذا كان غير موجود
       try {
         await db.execute('ALTER TABLE transactions ADD COLUMN custom_name TEXT');
-      } catch (e) {
-        // العمود موجود مسبقاً
-      }
+      } catch (e) {}
+    }
+    if (oldVersion < 3) {
+      try {
+        await db.execute('ALTER TABLE daily_records ADD COLUMN is_archived INTEGER DEFAULT 0');
+      } catch (e) {}
     }
   }
 
@@ -95,26 +94,117 @@ class DatabaseHelper {
       return await db.insert('daily_records', {
         'business_date': date,
         'status': 'open',
+        'is_archived': 0,
       });
     }
 
     return existing.first['id'] as int;
   }
 
-  Future<int?> getTodayRecordId() async {
-    final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
+  Future<Map<String, dynamic>?> getDailyRecord(String date) async {
     final db = await database;
-
     final result = await db.query(
       'daily_records',
       where: 'business_date = ?',
-      whereArgs: [today],
+      whereArgs: [date],
     );
+    return result.isNotEmpty ? result.first : null;
+  }
 
-    if (result.isNotEmpty) {
-      return result.first['id'] as int;
-    }
-    return null;
+  Future<int> closeDailyRecord(String date) async {
+    final db = await database;
+    return await db.update(
+      'daily_records',
+      {
+        'status': 'closed',
+        'closed_at': DateTime.now().toIso8601String(),
+      },
+      where: 'business_date = ?',
+      whereArgs: [date],
+    );
+  }
+
+  Future<int> archiveDailyRecord(String date) async {
+    final db = await database;
+    return await db.update(
+      'daily_records',
+      {'is_archived': 1},
+      where: 'business_date = ?',
+      whereArgs: [date],
+    );
+  }
+
+  Future<List<Map<String, dynamic>>> getAllDailyRecords() async {
+    final db = await database;
+    return await db.rawQuery('''
+      SELECT 
+        d.*,
+        COUNT(t.id) as transaction_count,
+        COALESCE(SUM(t.amount), 0) as total_amount,
+        COALESCE(SUM(CASE WHEN t.category = 'sambousa' THEN t.amount ELSE 0 END), 0) as sambousa_total,
+        COALESCE(SUM(CASE WHEN t.category = 'sweets' THEN t.amount ELSE 0 END), 0) as sweets_total,
+        COALESCE(SUM(CASE WHEN t.category = 'custom' THEN t.amount ELSE 0 END), 0) as custom_total
+      FROM daily_records d
+      LEFT JOIN transactions t ON d.id = t.daily_record_id
+      GROUP BY d.id
+      ORDER BY d.business_date DESC
+    ''');
+  }
+
+  Future<List<Map<String, dynamic>>> getArchivedRecords() async {
+    final db = await database;
+    return await db.rawQuery('''
+      SELECT 
+        d.*,
+        COUNT(t.id) as transaction_count,
+        COALESCE(SUM(t.amount), 0) as total_amount
+      FROM daily_records d
+      LEFT JOIN transactions t ON d.id = t.daily_record_id
+      WHERE d.is_archived = 1
+      GROUP BY d.id
+      ORDER BY d.business_date DESC
+    ''');
+  }
+
+  Future<List<Map<String, dynamic>>> getRecordsByMonth(int year, int month) async {
+    final db = await database;
+    final startDate = '$year-${month.toString().padLeft(2, '0')}-01';
+    final endDate = month < 12
+        ? '$year-${(month + 1).toString().padLeft(2, '0')}-01'
+        : '${year + 1}-01-01';
+
+    return await db.rawQuery('''
+      SELECT 
+        d.*,
+        COUNT(t.id) as transaction_count,
+        COALESCE(SUM(t.amount), 0) as total_amount
+      FROM daily_records d
+      LEFT JOIN transactions t ON d.id = t.daily_record_id
+      WHERE d.business_date >= ? AND d.business_date < ?
+      GROUP BY d.id
+      ORDER BY d.business_date DESC
+    ''', [startDate, endDate]);
+  }
+
+  Future<List<int>> getAvailableYears() async {
+    final db = await database;
+    final result = await db.rawQuery('''
+      SELECT DISTINCT substr(business_date, 1, 4) as year
+      FROM daily_records
+      ORDER BY year DESC
+    ''');
+    return result.map((r) => int.parse(r['year'] as String)).toList();
+  }
+
+  Future<List<int>> getAvailableMonths(int year) async {
+    final db = await database;
+    final result = await db.rawQuery('''
+      SELECT DISTINCT substr(business_date, 6, 2) as month
+      FROM daily_records
+      WHERE substr(business_date, 1, 4) = ?
+      ORDER BY month DESC
+    ''', ['$year']);
+    return result.map((r) => int.parse(r['month'] as String)).toList();
   }
 
   // ============ WALLETS ============
@@ -141,36 +231,20 @@ class DatabaseHelper {
 
   Future<int> updateWallet(int id, String name) async {
     final db = await database;
-    return await db.update(
-      'wallets',
-      {'name': name},
-      where: 'id = ?',
-      whereArgs: [id],
-    );
+    return await db.update('wallets', {'name': name}, where: 'id = ?', whereArgs: [id]);
   }
 
   Future<int> toggleWalletStatus(int id, bool isActive) async {
     final db = await database;
-    return await db.update(
-      'wallets',
-      {'is_active': isActive ? 1 : 0},
-      where: 'id = ?',
-      whereArgs: [id],
-    );
+    return await db.update('wallets', {'is_active': isActive ? 1 : 0}, where: 'id = ?', whereArgs: [id]);
   }
 
   Future<int> deleteWallet(int id) async {
     final db = await database;
-    final transactions = await db.query(
-      'transactions',
-      where: 'wallet_id = ?',
-      whereArgs: [id],
-    );
-
+    final transactions = await db.query('transactions', where: 'wallet_id = ?', whereArgs: [id]);
     if (transactions.isNotEmpty) {
-      throw Exception('لا يمكن حذف محفظة لها عمليات مسجلة. يمكنك تعطيلها بدلاً من ذلك.');
+      throw Exception('لا يمكن حذف محفظة لها عمليات مسجلة');
     }
-
     return await db.delete('wallets', where: 'id = ?', whereArgs: [id]);
   }
 
@@ -180,7 +254,7 @@ class DatabaseHelper {
     required int dailyRecordId,
     required int walletId,
     required String category,
-    String? customName,     // ← أضف هذا
+    String? customName,
     required double amount,
     String? note,
   }) async {
@@ -189,7 +263,7 @@ class DatabaseHelper {
       'daily_record_id': dailyRecordId,
       'wallet_id': walletId,
       'category': category,
-      'custom_name': customName,  // ← أضف هذا
+      'custom_name': customName,
       'amount': amount,
       'note': note,
       'created_at': DateTime.now().toIso8601String(),
@@ -200,29 +274,22 @@ class DatabaseHelper {
     required int id,
     required int walletId,
     required String category,
-    String? customName,     // ← أضف هذا
+    String? customName,
     required double amount,
     String? note,
   }) async {
     final db = await database;
-    return await db.update(
-      'transactions',
-      {
-        'wallet_id': walletId,
-        'category': category,
-        'custom_name': customName,  // ← أضف هذا
-        'amount': amount,
-        'note': note,
-      },
-      where: 'id = ?',
-      whereArgs: [id],
-    );
+    return await db.update('transactions', {
+      'wallet_id': walletId,
+      'category': category,
+      'custom_name': customName,
+      'amount': amount,
+      'note': note,
+    }, where: 'id = ?', whereArgs: [id]);
   }
 
-  Future<List<Map<String, dynamic>>> getTodayTransactions() async {
-    final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
+  Future<List<Map<String, dynamic>>> getTransactionsByDate(String date) async {
     final db = await database;
-
     return await db.rawQuery('''
       SELECT t.*, w.name as wallet_name, d.business_date
       FROM transactions t
@@ -230,7 +297,25 @@ class DatabaseHelper {
       INNER JOIN wallets w ON t.wallet_id = w.id
       WHERE d.business_date = ?
       ORDER BY t.created_at DESC
-    ''', [today]);
+    ''', [date]);
+  }
+
+  Future<List<Map<String, dynamic>>> getTodayTransactions() async {
+    final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
+    return getTransactionsByDate(today);
+  }
+
+  Future<List<Map<String, dynamic>>> getTransactionsByDateRange(
+      String startDate, String endDate) async {
+    final db = await database;
+    return await db.rawQuery('''
+      SELECT t.*, w.name as wallet_name, d.business_date
+      FROM transactions t
+      INNER JOIN daily_records d ON t.daily_record_id = d.id
+      INNER JOIN wallets w ON t.wallet_id = w.id
+      WHERE d.business_date >= ? AND d.business_date <= ?
+      ORDER BY d.business_date DESC, t.created_at DESC
+    ''', [startDate, endDate]);
   }
 
   Future<int> deleteTransaction(int id) async {
@@ -243,7 +328,6 @@ class DatabaseHelper {
   Future<Map<String, dynamic>> getDailyStatistics(String date) async {
     final db = await database;
 
-    // الإحصائيات العامة
     final result = await db.rawQuery('''
       SELECT 
         COALESCE(SUM(t.amount), 0) as total,
@@ -256,12 +340,8 @@ class DatabaseHelper {
       WHERE d.business_date = ?
     ''', [date]);
 
-    // إحصائيات العمليات المخصصة مجمعة حسب الاسم
     final customStats = await db.rawQuery('''
-      SELECT 
-        t.custom_name,
-        COALESCE(SUM(t.amount), 0) as total,
-        COUNT(t.id) as count
+      SELECT t.custom_name, COALESCE(SUM(t.amount), 0) as total, COUNT(t.id) as count
       FROM transactions t
       INNER JOIN daily_records d ON t.daily_record_id = d.id
       WHERE d.business_date = ? AND t.category = 'custom' AND t.custom_name IS NOT NULL
@@ -270,11 +350,46 @@ class DatabaseHelper {
     ''', [date]);
 
     if (result.isNotEmpty) {
-      final data = result.first;
+      final data = <String, dynamic>{};
+      data['total'] = result.first['total'] ?? 0;
+      data['sambousa'] = result.first['sambousa'] ?? 0;
+      data['sweets'] = result.first['sweets'] ?? 0;
+      data['custom_total'] = result.first['custom_total'] ?? 0;
+      data['count'] = result.first['count'] ?? 0;
       data['custom_stats'] = customStats;
       return data;
     }
-    return {'total': 0, 'sambousa': 0, 'sweets': 0, 'custom_total': 0, 'count': 0, 'custom_stats': []};
+    return {
+      'total': 0,
+      'sambousa': 0,
+      'sweets': 0,
+      'custom_total': 0,
+      'count': 0,
+      'custom_stats': <Map<String, dynamic>>[],
+    };
+  }
+
+  Future<Map<String, dynamic>> getMonthlyStatistics(int year, int month) async {
+    final db = await database;
+    final startDate = '$year-${month.toString().padLeft(2, '0')}-01';
+    final endDate = month < 12
+        ? '$year-${(month + 1).toString().padLeft(2, '0')}-01'
+        : '${year + 1}-01-01';
+
+    final result = await db.rawQuery('''
+      SELECT 
+        COALESCE(SUM(t.amount), 0) as total,
+        COALESCE(SUM(CASE WHEN t.category = 'sambousa' THEN t.amount ELSE 0 END), 0) as sambousa,
+        COALESCE(SUM(CASE WHEN t.category = 'sweets' THEN t.amount ELSE 0 END), 0) as sweets,
+        COALESCE(SUM(CASE WHEN t.category = 'custom' THEN t.amount ELSE 0 END), 0) as custom_total,
+        COUNT(t.id) as count,
+        COUNT(DISTINCT d.id) as days_count
+      FROM daily_records d
+      LEFT JOIN transactions t ON d.id = t.daily_record_id
+      WHERE d.business_date >= ? AND d.business_date < ?
+    ''', [startDate, endDate]);
+
+    return result.isNotEmpty ? result.first : {'total': 0, 'sambousa': 0, 'sweets': 0, 'custom_total': 0, 'count': 0, 'days_count': 0};
   }
 
   Future<List<Map<String, dynamic>>> getWalletStatistics(String date) async {
@@ -282,8 +397,7 @@ class DatabaseHelper {
 
     return await db.rawQuery('''
       SELECT 
-        w.id,
-        w.name,
+        w.id, w.name,
         COALESCE(SUM(t.amount), 0) as total,
         COUNT(t.id) as count,
         COALESCE(SUM(CASE WHEN t.category = 'sambousa' THEN t.amount ELSE 0 END), 0) as sambousa,
@@ -295,6 +409,75 @@ class DatabaseHelper {
       GROUP BY w.id, w.name
       ORDER BY total DESC
     ''', [date]);
+  }
+
+  Future<List<Map<String, dynamic>>> getWalletStatisticsByMonth(int year, int month) async {
+    final db = await database;
+    final startDate = '$year-${month.toString().padLeft(2, '0')}-01';
+    final endDate = month < 12
+        ? '$year-${(month + 1).toString().padLeft(2, '0')}-01'
+        : '${year + 1}-01-01';
+
+    return await db.rawQuery('''
+      SELECT 
+        w.id, w.name,
+        COALESCE(SUM(t.amount), 0) as total,
+        COUNT(t.id) as count,
+        COALESCE(SUM(CASE WHEN t.category = 'sambousa' THEN t.amount ELSE 0 END), 0) as sambousa,
+        COALESCE(SUM(CASE WHEN t.category = 'sweets' THEN t.amount ELSE 0 END), 0) as sweets,
+        COALESCE(SUM(CASE WHEN t.category = 'custom' THEN t.amount ELSE 0 END), 0) as custom_total
+      FROM wallets w
+      LEFT JOIN daily_records d ON d.business_date >= ? AND d.business_date < ?
+      LEFT JOIN transactions t ON t.wallet_id = w.id AND t.daily_record_id = d.id
+      GROUP BY w.id, w.name
+      ORDER BY total DESC
+    ''', [startDate, endDate]);
+  }
+
+  // ============ SEARCH ============
+
+  Future<List<Map<String, dynamic>>> searchTransactions({
+    String? walletName,
+    String? category,
+    String? customName,
+    String? startDate,
+    String? endDate,
+  }) async {
+    final db = await database;
+
+    String query = '''
+      SELECT t.*, w.name as wallet_name, d.business_date
+      FROM transactions t
+      INNER JOIN daily_records d ON t.daily_record_id = d.id
+      INNER JOIN wallets w ON t.wallet_id = w.id
+      WHERE 1=1
+    ''';
+    List<dynamic> args = [];
+
+    if (walletName != null && walletName.isNotEmpty) {
+      query += ' AND w.name LIKE ?';
+      args.add('%$walletName%');
+    }
+    if (category != null && category.isNotEmpty) {
+      query += ' AND t.category = ?';
+      args.add(category);
+    }
+    if (customName != null && customName.isNotEmpty) {
+      query += ' AND t.custom_name LIKE ?';
+      args.add('%$customName%');
+    }
+    if (startDate != null) {
+      query += ' AND d.business_date >= ?';
+      args.add(startDate);
+    }
+    if (endDate != null) {
+      query += ' AND d.business_date <= ?';
+      args.add(endDate);
+    }
+
+    query += ' ORDER BY d.business_date DESC, t.created_at DESC';
+
+    return await db.rawQuery(query, args);
   }
 
   // ============ BACKUP ============

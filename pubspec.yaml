@@ -12,24 +12,16 @@ dependencies:
   flutter_localizations:
     sdk: flutter
 
-  # للتخزين المحلي
   sqflite: ^2.3.0
   path: ^1.8.3
   path_provider: ^2.1.1
-
-  # للتنسيق والتواريخ
   intl: ^0.19.0
-
-  # للمشاركة والتصدير
   share_plus: ^7.2.1
-
-  # للطباعة
   printing: ^5.11.1
   pdf: ^3.10.7
-
-  # للتواصل وحفظ الإعدادات
   url_launcher: ^6.2.2
   shared_preferences: ^2.2.2
+  open_file: ^3.3.2          # لفتح ملفات PDF
 
 dev_dependencies:
   flutter_test:

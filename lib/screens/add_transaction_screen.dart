@@ -19,7 +19,6 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
   final _formKey = GlobalKey<FormState>();
 
   String? _selectedCategory;
-  String? _customName;
   int? _selectedWalletId;
   List<Map<String, dynamic>> _wallets = [];
   bool _isLoading = false;

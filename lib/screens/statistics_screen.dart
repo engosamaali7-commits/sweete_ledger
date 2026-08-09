@@ -64,7 +64,6 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // ملخص اليوم
             Card(
               child: Padding(
                 padding: const EdgeInsets.all(20),
@@ -111,12 +110,10 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
               ),
             ),
 
-            // عرض العمليات المخصصة
             if (_customStats.isNotEmpty) ...[
               const SizedBox(height: 24),
               Text(l10n.getString('other'),
-                  style: theme.textTheme.titleMedium
-                      ?.copyWith(fontWeight: FontWeight.bold)),
+                  style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
               const SizedBox(height: 12),
               Card(
                 child: Padding(
@@ -129,17 +126,14 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                         children: [
                           Row(
                             children: [
-                              const Icon(Icons.circle,
-                                  size: 8, color: Colors.teal),
+                              const Icon(Icons.circle, size: 8, color: Colors.teal),
                               const SizedBox(width: 8),
                               Text(stat['custom_name'] ?? ''),
                             ],
                           ),
                           Text(
-                            numberFormat.format(
-                                (stat['total'] as num?)?.toDouble() ?? 0),
-                            style: const TextStyle(
-                                fontWeight: FontWeight.bold),
+                            numberFormat.format((stat['total'] as num?)?.toDouble() ?? 0),
+                            style: const TextStyle(fontWeight: FontWeight.bold),
                           ),
                         ],
                       ),
@@ -151,10 +145,8 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
 
             const SizedBox(height: 24),
 
-            // أداء المحافظ
             Text(l10n.getString('wallet_performance'),
-                style: theme.textTheme.titleMedium
-                    ?.copyWith(fontWeight: FontWeight.bold)),
+                style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
             const SizedBox(height: 12),
 
             if (_walletStats.isEmpty)
@@ -172,11 +164,8 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        wallet['name'] ?? '',
-                        style: const TextStyle(
-                            fontWeight: FontWeight.bold, fontSize: 16),
-                      ),
+                      Text(wallet['name'] ?? '',
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                       const SizedBox(height: 8),
                       Row(
                         children: [
@@ -203,8 +192,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                       const SizedBox(height: 4),
                       Text(
                         'الإجمالي: ${numberFormat.format(wallet['total'] ?? 0)} • ${wallet['count']} ${l10n.getString('operations')}',
-                        style: const TextStyle(
-                            fontWeight: FontWeight.bold),
+                        style: const TextStyle(fontWeight: FontWeight.bold),
                       ),
                     ],
                   ),
@@ -220,8 +208,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
     return Column(
       children: [
         Text(value,
-            style: TextStyle(
-                fontWeight: FontWeight.bold, fontSize: 14, color: color)),
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: color)),
         Text(label, style: const TextStyle(fontSize: 10)),
       ],
     );

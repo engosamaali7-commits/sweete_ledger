@@ -21,6 +21,7 @@ class SettingsScreen extends StatefulWidget {
 class _SettingsScreenState extends State<SettingsScreen> {
   final DatabaseHelper _dbHelper = DatabaseHelper();
   String _currentLanguage = 'ar';
+  String _retentionPolicy = 'always';
 
   @override
   void initState() {
@@ -32,6 +33,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
       _currentLanguage = prefs.getString('language') ?? 'ar';
+      _retentionPolicy = prefs.getString('retentionPolicy') ?? 'always';
     });
   }
 
@@ -52,8 +54,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       if (await file.exists()) {
         await Share.shareXFiles(
           [XFile(dbPath)],
-          text:
-          'نسخة احتياطية - ${DateFormat('yyyy-MM-dd').format(DateTime.now())}',
+          text: 'نسخة احتياطية - ${DateFormat('yyyy-MM-dd').format(DateTime.now())}',
         );
       }
     } catch (e) {
@@ -86,6 +87,75 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
+  void _showRetentionPolicyDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('سياسة الاحتفاظ بالبيانات'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            RadioListTile(
+              title: const Text('الاحتفاظ دائماً'),
+              value: 'always',
+              groupValue: _retentionPolicy,
+              onChanged: (value) async {
+                final prefs = await SharedPreferences.getInstance();
+                await prefs.setString('retentionPolicy', value!);
+                setState(() => _retentionPolicy = value);
+                Navigator.pop(context);
+              },
+            ),
+            RadioListTile(
+              title: const Text('الأرشفة بعد 30 يوماً'),
+              value: '30days',
+              groupValue: _retentionPolicy,
+              onChanged: (value) async {
+                final prefs = await SharedPreferences.getInstance();
+                await prefs.setString('retentionPolicy', value!);
+                setState(() => _retentionPolicy = value);
+                Navigator.pop(context);
+              },
+            ),
+            RadioListTile(
+              title: const Text('الأرشفة بعد 3 أشهر'),
+              value: '3months',
+              groupValue: _retentionPolicy,
+              onChanged: (value) async {
+                final prefs = await SharedPreferences.getInstance();
+                await prefs.setString('retentionPolicy', value!);
+                setState(() => _retentionPolicy = value);
+                Navigator.pop(context);
+              },
+            ),
+            RadioListTile(
+              title: const Text('الأرشفة بعد 6 أشهر'),
+              value: '6months',
+              groupValue: _retentionPolicy,
+              onChanged: (value) async {
+                final prefs = await SharedPreferences.getInstance();
+                await prefs.setString('retentionPolicy', value!);
+                setState(() => _retentionPolicy = value);
+                Navigator.pop(context);
+              },
+            ),
+            RadioListTile(
+              title: const Text('الأرشفة بعد سنة'),
+              value: '1year',
+              groupValue: _retentionPolicy,
+              onChanged: (value) async {
+                final prefs = await SharedPreferences.getInstance();
+                await prefs.setString('retentionPolicy', value!);
+                setState(() => _retentionPolicy = value);
+                Navigator.pop(context);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
@@ -103,7 +173,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
           Card(
             child: Column(
               children: [
-                // اللغة
                 ListTile(
                   leading: const Icon(Icons.language),
                   title: Text(l10n.getString('language')),
@@ -120,17 +189,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                 ),
                 const Divider(height: 1),
-                // المظهر
                 ListTile(
                   leading: const Icon(Icons.palette),
                   title: Text(l10n.getString('theme')),
                   trailing: const Icon(Icons.chevron_left),
-                  onTap: () {
-                    // TODO: فتح إعدادات المظهر
-                  },
+                  onTap: () {},
                 ),
                 const Divider(height: 1),
-                // معلومات التطبيق
                 ListTile(
                   leading: const Icon(Icons.info_outline),
                   title: Text(l10n.getString('app_info')),
@@ -138,8 +203,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   onTap: () {
                     Navigator.push(
                       context,
-                      MaterialPageRoute(
-                          builder: (context) => const AboutScreen()),
+                      MaterialPageRoute(builder: (context) => const AboutScreen()),
                     );
                   },
                 ),
@@ -174,10 +238,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   trailing: const Icon(Icons.chevron_left),
                   onTap: () {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                          content: Text('سيتم إضافة هذه الميزة قريباً')),
+                      const SnackBar(content: Text('سيتم إضافة هذه الميزة قريباً')),
                     );
                   },
+                ),
+                const Divider(height: 1),
+                ListTile(
+                  leading: const Icon(Icons.storage),
+                  title: const Text('إدارة الاحتفاظ بالبيانات'),
+                  subtitle: Text(_retentionPolicy == 'always' ? 'الاحتفاظ دائماً' : _retentionPolicy),
+                  trailing: const Icon(Icons.chevron_left),
+                  onTap: _showRetentionPolicyDialog,
                 ),
               ],
             ),
@@ -195,8 +266,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               onTap: () {
                 Navigator.push(
                   context,
-                  MaterialPageRoute(
-                      builder: (context) => const WalletsScreen()),
+                  MaterialPageRoute(builder: (context) => const WalletsScreen()),
                 );
               },
             ),
@@ -211,9 +281,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               leading: const Icon(Icons.description),
               title: Text(l10n.getString('reports_settings')),
               trailing: const Icon(Icons.chevron_left),
-              onTap: () {
-                // TODO: فتح إعدادات التقارير
-              },
+              onTap: () {},
             ),
           ),
 
@@ -242,15 +310,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   leading: const Icon(Icons.campaign, color: Colors.green),
                   title: Text(l10n.getString('whatsapp_channel')),
                   subtitle: const Text('مركز الدفاع الإلكتروني'),
-                  onTap: () => _openUrl(
-                      'https://whatsapp.com/channel/0029Vb5lkNCKmCPSvOoUOz0M'),
+                  onTap: () => _openUrl('https://whatsapp.com/channel/0029Vb5lkNCKmCPSvOoUOz0M'),
                 ),
                 const Divider(height: 1),
                 ListTile(
                   leading: const Icon(Icons.code, color: Colors.black),
                   title: Text(l10n.getString('github')),
-                  onTap: () => _openUrl(
-                      'https://github.com/engosamaali7-commits'),
+                  onTap: () => _openUrl('https://github.com/engosamaali7-commits'),
                 ),
               ],
             ),
@@ -268,8 +334,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               onTap: () {
                 Navigator.push(
                   context,
-                  MaterialPageRoute(
-                      builder: (context) => const AboutScreen()),
+                  MaterialPageRoute(builder: (context) => const AboutScreen()),
                 );
               },
             ),

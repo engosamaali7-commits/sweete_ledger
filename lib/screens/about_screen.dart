@@ -40,7 +40,6 @@ class AboutScreen extends StatelessWidget {
         child: Column(
           children: [
             const SizedBox(height: 20),
-            // أيقونة التطبيق
             Container(
               width: 100,
               height: 100,
@@ -55,17 +54,11 @@ class AboutScreen extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 16),
-
-            // اسم التطبيق
             Text(
               l10n.getString('app_title'),
-              style: theme.textTheme.headlineMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
+              style: theme.textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
-
-            // وصف التطبيق
             Text(
               l10n.getString('app_description'),
               textAlign: TextAlign.center,
@@ -74,79 +67,44 @@ class AboutScreen extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 8),
-
-            // الإصدار
             Text(
               '${l10n.getString('version')}: 1.0.0',
               style: theme.textTheme.bodySmall,
             ),
-
             const SizedBox(height: 32),
             const Divider(),
             const SizedBox(height: 16),
-
-            // معلومات المطور
             Text(
               l10n.getString('developer_info'),
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
+              style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 16),
-
             Card(
               child: Padding(
                 padding: const EdgeInsets.all(16),
                 child: Column(
                   children: [
-                    const CircleAvatar(
-                      radius: 30,
-                      child: Icon(Icons.person, size: 30),
-                    ),
+                    const CircleAvatar(radius: 30, child: Icon(Icons.person, size: 30)),
                     const SizedBox(height: 12),
-                    Text(
-                      l10n.getString('developer_name'),
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    Text(
-                      l10n.getString('developer_title'),
-                      style: theme.textTheme.bodySmall,
-                    ),
+                    Text(l10n.getString('developer_name'),
+                        style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+                    Text(l10n.getString('developer_title'), style: theme.textTheme.bodySmall),
                     const SizedBox(height: 16),
-
-                    // أزرار التواصل
-                    _buildContactButton(
-                      Icons.phone,
-                      '+967 780 155 801',
-                          () => _callPhone('967780155801'),
-                    ),
+                    _buildContactButton(Icons.phone, '+967 780 155 801',
+                            () => _callPhone('967780155801')),
                     const SizedBox(height: 8),
-                    _buildContactButton(
-                      Icons.chat,
-                      l10n.getString('contact_whatsapp'),
-                          () => _openWhatsApp('967780155801'),
-                    ),
+                    _buildContactButton(Icons.chat, l10n.getString('contact_whatsapp'),
+                            () => _openWhatsApp('967780155801')),
                     const SizedBox(height: 8),
-                    _buildContactButton(
-                      Icons.campaign,
-                      l10n.getString('whatsapp_channel'),
-                          () => _openUrl(
-                          'https://whatsapp.com/channel/0029Vb5lkNCKmCPSvOoUOz0M'),
-                    ),
+                    _buildContactButton(Icons.campaign, l10n.getString('whatsapp_channel'),
+                            () => _openUrl('https://whatsapp.com/channel/0029Vb5lkNCKmCPSvOoUOz0M')),
                     const SizedBox(height: 8),
-                    _buildContactButton(
-                      Icons.code,
-                      l10n.getString('github'),
-                          () => _openUrl(
-                          'https://github.com/engosamaali7-commits'),
-                    ),
+                    _buildContactButton(Icons.code, l10n.getString('github'),
+                            () => _openUrl('https://github.com/engosamaali7-commits')),
                   ],
                 ),
               ),
             ),
-
             const SizedBox(height: 32),
           ],
         ),
@@ -154,17 +112,14 @@ class AboutScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildContactButton(
-      IconData icon, String label, VoidCallback onTap) {
+  Widget _buildContactButton(IconData icon, String label, VoidCallback onTap) {
     return SizedBox(
       width: double.infinity,
       child: OutlinedButton.icon(
         onPressed: onTap,
         icon: Icon(icon),
         label: Text(label),
-        style: OutlinedButton.styleFrom(
-          padding: const EdgeInsets.symmetric(vertical: 12),
-        ),
+        style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 12)),
       ),
     );
   }

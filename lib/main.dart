@@ -8,10 +8,8 @@ import 'l10n/app_localizations.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // تهيئة التواريخ
   await initializeDateFormatting('ar');
 
-  // تحميل اللغة المحفوظة
   final prefs = await SharedPreferences.getInstance();
   final savedLocale = prefs.getString('language') ?? 'ar';
 
@@ -33,13 +31,15 @@ class _MyAppState extends State<MyApp> {
   @override
   void initState() {
     super.initState();
-    _currentLocale = widget.initialLocale;
+    _currentLocale = widget.initialLocale.isNotEmpty ? widget.initialLocale : 'ar';
   }
 
   void changeLanguage(String languageCode) {
-    setState(() {
-      _currentLocale = languageCode;
-    });
+    if (languageCode.isNotEmpty && mounted) {
+      setState(() {
+        _currentLocale = languageCode;
+      });
+    }
   }
 
   @override
@@ -48,7 +48,6 @@ class _MyAppState extends State<MyApp> {
       title: 'دفتر المحافظ',
       debugShowCheckedModeBanner: false,
 
-      // ========== اللغة ==========
       locale: Locale(_currentLocale),
       supportedLocales: const [
         Locale('ar'),
@@ -61,7 +60,6 @@ class _MyAppState extends State<MyApp> {
         GlobalCupertinoLocalizations.delegate,
       ],
 
-      // ========== الثيم ==========
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(
           seedColor: Colors.brown,
@@ -77,7 +75,6 @@ class _MyAppState extends State<MyApp> {
         useMaterial3: true,
       ),
 
-      // ========== الشاشة الرئيسية ==========
       home: HomeScreen(onLanguageChanged: changeLanguage),
     );
   }
