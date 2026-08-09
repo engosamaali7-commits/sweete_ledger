@@ -27,6 +27,10 @@ dependencies:
   printing: ^5.11.1
   pdf: ^3.10.7
 
+  # للتواصل وحفظ الإعدادات
+  url_launcher: ^6.2.2
+  shared_preferences: ^2.2.2
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

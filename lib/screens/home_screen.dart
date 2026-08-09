@@ -1,13 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../database/database_helper.dart';
+import '../l10n/app_localizations.dart';
 import 'add_transaction_screen.dart';
 import 'wallets_screen.dart';
 import 'statistics_screen.dart';
 import 'settings_screen.dart';
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+  final Function(String)? onLanguageChanged;
+
+  const HomeScreen({super.key, this.onLanguageChanged});
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -19,6 +22,8 @@ class _HomeScreenState extends State<HomeScreen> {
   double _totalToday = 0;
   double _totalSambousa = 0;
   double _totalSweets = 0;
+  double _totalCustom = 0;
+  List<Map<String, dynamic>> _customStats = [];
   int _transactionCount = 0;
   List<Map<String, dynamic>> _walletStats = [];
 
@@ -42,6 +47,11 @@ class _HomeScreenState extends State<HomeScreen> {
         _totalToday = (stats['total'] as num?)?.toDouble() ?? 0;
         _totalSambousa = (stats['sambousa'] as num?)?.toDouble() ?? 0;
         _totalSweets = (stats['sweets'] as num?)?.toDouble() ?? 0;
+        _totalCustom = (stats['custom_total'] as num?)?.toDouble() ?? 0;
+        _customStats = (stats['custom_stats'] as List<dynamic>?)
+            ?.map((e) => e as Map<String, dynamic>)
+            .toList() ??
+            [];
         _transactionCount = (stats['count'] as int?) ?? 0;
         _walletStats = walletStats;
       });
@@ -50,28 +60,23 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _navigateTo(int index) async {
     if (index == 2) {
-      // فتح صفحة المحافظ
       await Navigator.push(
         context,
-        MaterialPageRoute(
-          builder: (context) => const WalletsScreen(),
-        ),
+        MaterialPageRoute(builder: (context) => const WalletsScreen()),
       );
       _loadTodayData();
     } else if (index == 3) {
-      // فتح صفحة الإحصائيات
       await Navigator.push(
         context,
-        MaterialPageRoute(
-          builder: (context) => const StatisticsScreen(),
-        ),
+        MaterialPageRoute(builder: (context) => const StatisticsScreen()),
       );
     } else if (index == 4) {
-      // فتح صفحة الإعدادات
       await Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (context) => const SettingsScreen(),
+          builder: (context) => SettingsScreen(
+            onLanguageChanged: widget.onLanguageChanged,
+          ),
         ),
       );
     } else {
@@ -84,9 +89,7 @@ class _HomeScreenState extends State<HomeScreen> {
   void _openAddTransaction() async {
     final result = await Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (context) => const AddTransactionScreen(),
-      ),
+      MaterialPageRoute(builder: (context) => const AddTransactionScreen()),
     );
     if (result == true) {
       _loadTodayData();
@@ -95,55 +98,56 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+
     return Scaffold(
-      body: _currentIndex == 0
-          ? _buildDashboard()
-          : _buildTransactionsList(),
+      body: _currentIndex == 0 ? _buildDashboard(l10n) : _buildTransactionsList(l10n),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _currentIndex,
         onDestinationSelected: _navigateTo,
-        destinations: const [
+        destinations: [
           NavigationDestination(
-            icon: Icon(Icons.dashboard_outlined),
-            selectedIcon: Icon(Icons.dashboard),
-            label: 'الرئيسية',
+            icon: const Icon(Icons.dashboard_outlined),
+            selectedIcon: const Icon(Icons.dashboard),
+            label: l10n.getString('dashboard'),
           ),
           NavigationDestination(
-            icon: Icon(Icons.receipt_long_outlined),
-            selectedIcon: Icon(Icons.receipt_long),
-            label: 'العمليات',
+            icon: const Icon(Icons.receipt_long_outlined),
+            selectedIcon: const Icon(Icons.receipt_long),
+            label: l10n.getString('transactions'),
           ),
           NavigationDestination(
-            icon: Icon(Icons.account_balance_wallet_outlined),
-            selectedIcon: Icon(Icons.account_balance_wallet),
-            label: 'المحافظ',
+            icon: const Icon(Icons.account_balance_wallet_outlined),
+            selectedIcon: const Icon(Icons.account_balance_wallet),
+            label: l10n.getString('wallets'),
           ),
           NavigationDestination(
-            icon: Icon(Icons.bar_chart_outlined),
-            selectedIcon: Icon(Icons.bar_chart),
-            label: 'إحصائيات',
+            icon: const Icon(Icons.bar_chart_outlined),
+            selectedIcon: const Icon(Icons.bar_chart),
+            label: l10n.getString('statistics'),
           ),
           NavigationDestination(
-            icon: Icon(Icons.settings_outlined),
-            selectedIcon: Icon(Icons.settings),
-            label: 'إعدادات',
+            icon: const Icon(Icons.settings_outlined),
+            selectedIcon: const Icon(Icons.settings),
+            label: l10n.getString('settings'),
           ),
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _openAddTransaction,
         icon: const Icon(Icons.add),
-        label: const Text('تسجيل عملية'),
+        label: Text(l10n.getString('add_transaction')),
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
     );
   }
 
   // ================ DASHBOARD ================
-  Widget _buildDashboard() {
+  Widget _buildDashboard(AppLocalizations l10n) {
     final theme = Theme.of(context);
     final now = DateTime.now();
-    final dateStr = DateFormat('EEEE d MMMM yyyy', 'ar').format(now);
+    final isArabic = Localizations.localeOf(context).languageCode == 'ar';
+    final dateStr = DateFormat('EEEE d MMMM yyyy', isArabic ? 'ar' : 'en').format(now);
 
     return SafeArea(
       child: RefreshIndicator(
@@ -157,11 +161,10 @@ class _HomeScreenState extends State<HomeScreen> {
                 padding: const EdgeInsets.all(16),
                 child: Column(
                   children: [
-                    Text('صباح الخير 👋',
+                    Text(l10n.getString('good_morning'),
                         style: theme.textTheme.titleMedium),
                     const SizedBox(height: 4),
-                    Text(dateStr,
-                        style: theme.textTheme.bodySmall),
+                    Text(dateStr, style: theme.textTheme.bodySmall),
                   ],
                 ),
               ),
@@ -173,7 +176,7 @@ class _HomeScreenState extends State<HomeScreen> {
               children: [
                 Expanded(
                   child: _buildSummaryCard(
-                    'إجمالي اليوم',
+                    l10n.getString('today_total'),
                     _formatCurrency(_totalToday),
                     Icons.today,
                     theme.colorScheme.primary,
@@ -182,19 +185,32 @@ class _HomeScreenState extends State<HomeScreen> {
                 const SizedBox(width: 8),
                 Expanded(
                   child: _buildSummaryCard(
-                    'السمبوسة',
+                    l10n.getString('sambousa'),
                     _formatCurrency(_totalSambousa),
                     Icons.fastfood,
                     Colors.orange,
                   ),
                 ),
-                const SizedBox(width: 8),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
                 Expanded(
                   child: _buildSummaryCard(
-                    'الحلويات',
+                    l10n.getString('sweets'),
                     _formatCurrency(_totalSweets),
                     Icons.cake,
                     Colors.pink,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _buildSummaryCard(
+                    l10n.getString('other'),
+                    _formatCurrency(_totalCustom),
+                    Icons.more_horiz,
+                    Colors.teal,
                   ),
                 ),
               ],
@@ -211,19 +227,59 @@ class _HomeScreenState extends State<HomeScreen> {
                     const Icon(Icons.receipt_long, color: Colors.blue),
                     const SizedBox(width: 8),
                     Text(
-                      'عدد العمليات: $_transactionCount',
+                      '${l10n.getString('operations_count')}: $_transactionCount',
                       style: theme.textTheme.titleMedium,
                     ),
                   ],
                 ),
               ),
             ),
+
+            // عرض العمليات المخصصة إذا وجدت
+            if (_customStats.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(l10n.getString('other'),
+                          style: theme.textTheme.titleMedium
+                              ?.copyWith(fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 8),
+                      ..._customStats.map((stat) => Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 4),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Row(
+                              children: [
+                                const Icon(Icons.circle, size: 8, color: Colors.teal),
+                                const SizedBox(width: 8),
+                                Text(stat['custom_name'] ?? ''),
+                              ],
+                            ),
+                            Text(
+                              _formatCurrency(
+                                  (stat['total'] as num?)?.toDouble() ?? 0),
+                              style: const TextStyle(fontWeight: FontWeight.bold),
+                            ),
+                          ],
+                        ),
+                      )),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+
             const SizedBox(height: 20),
 
             // أداء المحافظ
-            Text('أداء المحافظ',
-                style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.bold)),
+            Text(l10n.getString('wallet_performance'),
+                style: theme.textTheme.titleMedium
+                    ?.copyWith(fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
 
             if (_walletStats.isEmpty)
@@ -235,7 +291,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       Icon(Icons.account_balance_wallet,
                           size: 48, color: Colors.grey[400]),
                       const SizedBox(height: 8),
-                      const Text('لا توجد عمليات اليوم'),
+                      Text(l10n.getString('no_operations')),
                     ],
                   ),
                 ),
@@ -250,7 +306,8 @@ class _HomeScreenState extends State<HomeScreen> {
                         color: Colors.blue),
                   ),
                   title: Text('${wallet['name'] ?? ''}'),
-                  subtitle: Text('${wallet['count'] ?? 0} عمليات'),
+                  subtitle: Text(
+                      '${wallet['count'] ?? 0} ${l10n.getString('operations')}'),
                   trailing: Text(
                     _formatCurrency(
                         (wallet['total'] as num?)?.toDouble() ?? 0),
@@ -266,17 +323,16 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   // ================ TRANSACTIONS LIST ================
-  Widget _buildTransactionsList() {
+  Widget _buildTransactionsList(AppLocalizations l10n) {
     return SafeArea(
       child: Column(
         children: [
-          // شريط عنوان بسيط
           Padding(
             padding: const EdgeInsets.all(16),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text('سجل العمليات',
+                Text(l10n.getString('transactions'),
                     style: Theme.of(context).textTheme.titleLarge),
                 IconButton(
                   icon: const Icon(Icons.refresh),
@@ -303,7 +359,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         Icon(Icons.receipt_long,
                             size: 64, color: Colors.grey[400]),
                         const SizedBox(height: 16),
-                        Text('لا توجد عمليات اليوم',
+                        Text(l10n.getString('no_operations'),
                             style: TextStyle(
                                 fontSize: 18, color: Colors.grey[600])),
                       ],
@@ -316,11 +372,35 @@ class _HomeScreenState extends State<HomeScreen> {
                   itemCount: transactions.length,
                   itemBuilder: (context, index) {
                     final t = transactions[index];
-                    final isSambousa = t['category'] == 'sambousa';
+                    final category = t['category'] as String;
+                    final isSambousa = category == 'sambousa';
+                    final isSweets = category == 'sweets';
+                    final isCustom = category == 'custom';
                     final time = t['created_at'] != null
-                        ? DateFormat('hh:mm a', 'ar').format(
-                        DateTime.parse(t['created_at']))
+                        ? DateFormat('hh:mm a',
+                        Localizations.localeOf(context).languageCode == 'ar'
+                            ? 'ar'
+                            : 'en')
+                        .format(DateTime.parse(t['created_at']))
                         : '';
+
+                    IconData icon;
+                    Color color;
+                    String title;
+
+                    if (isSambousa) {
+                      icon = Icons.fastfood;
+                      color = Colors.orange;
+                      title = l10n.getString('sambousa');
+                    } else if (isSweets) {
+                      icon = Icons.cake;
+                      color = Colors.pink;
+                      title = l10n.getString('sweets');
+                    } else {
+                      icon = Icons.more_horiz;
+                      color = Colors.teal;
+                      title = t['custom_name'] ?? l10n.getString('other');
+                    }
 
                     return Card(
                       margin: const EdgeInsets.only(bottom: 8),
@@ -328,16 +408,12 @@ class _HomeScreenState extends State<HomeScreen> {
                         leading: Container(
                           padding: const EdgeInsets.all(8),
                           decoration: BoxDecoration(
-                            color: (isSambousa ? Colors.orange : Colors.pink)
-                                .withOpacity(0.1),
+                            color: color.withOpacity(0.1),
                             borderRadius: BorderRadius.circular(8),
                           ),
-                          child: Icon(
-                            isSambousa ? Icons.fastfood : Icons.cake,
-                            color: isSambousa ? Colors.orange : Colors.pink,
-                          ),
+                          child: Icon(icon, color: color),
                         ),
-                        title: Text(isSambousa ? 'سمبوسة' : 'حلويات'),
+                        title: Text(title),
                         subtitle: Text('${t['wallet_name'] ?? ''} • $time'),
                         trailing: Text(
                           _formatCurrency(
@@ -345,7 +421,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           style: const TextStyle(
                               fontWeight: FontWeight.bold, fontSize: 16),
                         ),
-                        onTap: () => _showTransactionOptions(t),
+                        onTap: () => _showTransactionOptions(t, l10n),
                       ),
                     );
                   },
@@ -358,7 +434,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  void _showTransactionOptions(Map<String, dynamic> transaction) {
+  void _showTransactionOptions(Map<String, dynamic> transaction, AppLocalizations l10n) {
     showModalBottomSheet(
       context: context,
       builder: (context) => SafeArea(
@@ -367,7 +443,7 @@ class _HomeScreenState extends State<HomeScreen> {
           children: [
             ListTile(
               leading: const Icon(Icons.edit),
-              title: const Text('تعديل'),
+              title: Text(l10n.getString('edit')),
               onTap: () {
                 Navigator.pop(context);
                 // TODO: فتح شاشة التعديل
@@ -375,11 +451,11 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             ListTile(
               leading: const Icon(Icons.delete, color: Colors.red),
-              title:
-              const Text('حذف', style: TextStyle(color: Colors.red)),
+              title: Text(l10n.getString('delete'),
+                  style: const TextStyle(color: Colors.red)),
               onTap: () {
                 Navigator.pop(context);
-                _confirmDelete(transaction['id']);
+                _confirmDelete(transaction['id'], l10n);
               },
             ),
           ],
@@ -388,16 +464,16 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  void _confirmDelete(int transactionId) {
+  void _confirmDelete(int transactionId, AppLocalizations l10n) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('تأكيد الحذف'),
-        content: const Text('هل تريد حذف هذه العملية؟'),
+        title: Text(l10n.getString('confirm_delete')),
+        content: Text(l10n.getString('delete_confirm_msg')),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('إلغاء'),
+            child: Text(l10n.getString('cancel')),
           ),
           TextButton(
             onPressed: () async {
@@ -405,8 +481,8 @@ class _HomeScreenState extends State<HomeScreen> {
               await _dbHelper.deleteTransaction(transactionId);
               _loadTodayData();
             },
-            child:
-            const Text('حذف', style: TextStyle(color: Colors.red)),
+            child: Text(l10n.getString('delete'),
+                style: const TextStyle(color: Colors.red)),
           ),
         ],
       ),
@@ -435,7 +511,8 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   String _formatCurrency(double amount) {
-    final format = NumberFormat('#,###', 'ar');
+    final isArabic = Localizations.localeOf(context).languageCode == 'ar';
+    final format = NumberFormat('#,###', isArabic ? 'ar' : 'en');
     return format.format(amount);
   }
 }

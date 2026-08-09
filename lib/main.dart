@@ -1,19 +1,46 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_localizations/flutter_localizations.dart';  // ← ضروري جداً
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:intl/date_symbol_data_local.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'screens/home_screen.dart';
+import 'l10n/app_localizations.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // تهيئة اللغة العربية للتواريخ
+  // تهيئة التواريخ
   await initializeDateFormatting('ar');
 
-  runApp(const MyApp());
+  // تحميل اللغة المحفوظة
+  final prefs = await SharedPreferences.getInstance();
+  final savedLocale = prefs.getString('language') ?? 'ar';
+
+  runApp(MyApp(initialLocale: savedLocale));
 }
 
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+class MyApp extends StatefulWidget {
+  final String initialLocale;
+
+  const MyApp({super.key, required this.initialLocale});
+
+  @override
+  State<MyApp> createState() => _MyAppState();
+}
+
+class _MyAppState extends State<MyApp> {
+  late String _currentLocale;
+
+  @override
+  void initState() {
+    super.initState();
+    _currentLocale = widget.initialLocale;
+  }
+
+  void changeLanguage(String languageCode) {
+    setState(() {
+      _currentLocale = languageCode;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -21,16 +48,17 @@ class MyApp extends StatelessWidget {
       title: 'دفتر المحافظ',
       debugShowCheckedModeBanner: false,
 
-      // ========== اللغة العربية ==========
-      locale: const Locale('ar'),
+      // ========== اللغة ==========
+      locale: Locale(_currentLocale),
       supportedLocales: const [
         Locale('ar'),
         Locale('en'),
       ],
       localizationsDelegates: const [
-        GlobalMaterialLocalizations.delegate,   // ← هذا المطلوب لـ AppBar
-        GlobalWidgetsLocalizations.delegate,    // ← هذا المطلوب للـ Widgets
-        GlobalCupertinoLocalizations.delegate,  // ← هذا لـ Cupertino widgets
+        AppLocalizations.delegate,
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
       ],
 
       // ========== الثيم ==========
@@ -50,7 +78,7 @@ class MyApp extends StatelessWidget {
       ),
 
       // ========== الشاشة الرئيسية ==========
-      home: const HomeScreen(),
+      home: HomeScreen(onLanguageChanged: changeLanguage),
     );
   }
 }
