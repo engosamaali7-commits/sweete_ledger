@@ -5,27 +5,20 @@ import '../l10n/app_localizations.dart';
 class AboutScreen extends StatelessWidget {
   const AboutScreen({super.key});
 
+  // ✅ دوال فتح الروابط مباشرة
   Future<void> _openUrl(String url) async {
     final uri = Uri.parse(url);
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-    }
+    await launchUrl(uri, mode: LaunchMode.externalApplication);
   }
 
   Future<void> _callPhone(String phone) async {
     final uri = Uri.parse('tel:$phone');
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri);
-    }
+    await launchUrl(uri);
   }
 
   Future<void> _openWhatsApp(String phone) async {
     final uri = Uri.parse('https://wa.me/$phone');
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-    } else {
-      await _openUrl('https://wa.me/$phone');
-    }
+    await launchUrl(uri, mode: LaunchMode.externalApplication);
   }
 
   @override
@@ -34,9 +27,7 @@ class AboutScreen extends StatelessWidget {
     final theme = Theme.of(context);
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(l10n.getString('about')),
-      ),
+      appBar: AppBar(title: Text(l10n.getString('about'))),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -88,21 +79,39 @@ class AboutScreen extends StatelessWidget {
                   children: [
                     const CircleAvatar(radius: 30, child: Icon(Icons.person, size: 30)),
                     const SizedBox(height: 12),
-                    Text(l10n.getString('developer_name'),
-                        style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+                    Text(
+                      l10n.getString('developer_name'),
+                      style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                    ),
                     Text(l10n.getString('developer_title'), style: theme.textTheme.bodySmall),
                     const SizedBox(height: 16),
-                    _buildContactButton(Icons.phone, '+967 780 155 801',
-                            () => _callPhone('967780155801')),
+                    // ✅ زر الاتصال
+                    _buildContactButton(
+                      Icons.phone,
+                      '+967 780 155 801',
+                          () => _callPhone('967780155801'),
+                    ),
                     const SizedBox(height: 8),
-                    _buildContactButton(Icons.chat, l10n.getString('contact_whatsapp'),
-                            () => _openWhatsApp('967780155801')),
+                    // ✅ زر WhatsApp
+                    _buildContactButton(
+                      Icons.chat,
+                      l10n.getString('contact_whatsapp'),
+                          () => _openWhatsApp('967780155801'),
+                    ),
                     const SizedBox(height: 8),
-                    _buildContactButton(Icons.campaign, l10n.getString('whatsapp_channel'),
-                            () => _openUrl('https://whatsapp.com/channel/0029Vb5lkNCKmCPSvOoUOz0M')),
+                    // ✅ زر قناة WhatsApp
+                    _buildContactButton(
+                      Icons.campaign,
+                      l10n.getString('whatsapp_channel'),
+                          () => _openUrl('https://whatsapp.com/channel/0029Vb5lkNCKmCPSvOoUOz0M'),
+                    ),
                     const SizedBox(height: 8),
-                    _buildContactButton(Icons.code, l10n.getString('github'),
-                            () => _openUrl('https://github.com/engosamaali7-commits/OQ-Developer')),
+                    // ✅ زر GitHub
+                    _buildContactButton(
+                      Icons.code,
+                      l10n.getString('github'),
+                          () => _openUrl('https://github.com/engosamaali7-commits/OQ-Developer'),
+                    ),
                   ],
                 ),
               ),

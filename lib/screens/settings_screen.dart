@@ -44,11 +44,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _changeLanguage(String languageCode) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('language', languageCode);
-    if (mounted) {
-      setState(() {
-        _currentLanguage = languageCode;
-      });
-    }
+    if (mounted) setState(() => _currentLanguage = languageCode);
     widget.onLanguageChanged?.call(languageCode);
   }
 
@@ -56,7 +52,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
     try {
       final dbPath = await _dbHelper.getDatabasePath();
       final file = File(dbPath);
-
       if (await file.exists()) {
         await Share.shareXFiles(
           [XFile(dbPath)],
@@ -65,38 +60,25 @@ class _SettingsScreenState extends State<SettingsScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('خطأ: $e')),
-        );
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('خطأ: $e')));
       }
     }
   }
 
+  // ✅ دالة فتح الروابط - تعمل مباشرة بدون canLaunchUrl
   Future<void> _openUrl(String url) async {
     final uri = Uri.parse(url);
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-    } else if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('تعذر فتح الرابط')),
-      );
-    }
+    await launchUrl(uri, mode: LaunchMode.externalApplication);
   }
 
   Future<void> _callPhone(String phone) async {
     final uri = Uri.parse('tel:$phone');
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri);
-    }
+    await launchUrl(uri);
   }
 
   Future<void> _openWhatsApp(String phone) async {
     final uri = Uri.parse('https://wa.me/$phone');
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-    } else {
-      await _openUrl('https://wa.me/$phone');
-    }
+    await launchUrl(uri, mode: LaunchMode.externalApplication);
   }
 
   void _showRetentionPolicyDialog() {
@@ -174,9 +156,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final isArabic = _currentLanguage == 'ar';
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(l10n.getString('settings')),
-      ),
+      appBar: AppBar(title: Text(l10n.getString('settings'))),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
@@ -293,7 +273,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
           const SizedBox(height: 16),
 
-          // ============ التقارير ============
+          // ============ التقارير ✅ رابط صحيح ============
           _buildSectionHeader(l10n.getString('reports_section')),
           Card(
             child: ListTile(
@@ -301,14 +281,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
               title: Text(l10n.getString('reports_settings')),
               trailing: const Icon(Icons.chevron_left),
               onTap: () {
-                Navigator.push(context, MaterialPageRoute(builder: (_) => const ReportsScreen()));
+                // ✅ فتح صفحة التقارير مباشرة
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const ReportsScreen()),
+                );
               },
             ),
           ),
 
           const SizedBox(height: 16),
 
-          // ============ التواصل ============
+          // ============ التواصل ✅ روابط صحيحة ============
           _buildSectionHeader(l10n.getString('contact_section')),
           Card(
             child: Column(

@@ -4,8 +4,8 @@ import 'package:printing/printing.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:intl/intl.dart';
-import 'package:flutter/services.dart' show rootBundle;
 import 'dart:io';
+import 'package:flutter/services.dart' show rootBundle;
 import '../database/database_helper.dart';
 import '../l10n/app_localizations.dart';
 
@@ -16,23 +16,29 @@ class PdfService {
   Future<void> _loadFonts() async {
     if (_arabicFont != null) return;
 
+    // محاولة تحميل الخط من assets
     try {
-      final arabicFontData = await rootBundle.load('assets/fonts/NotoNaskhArabic-Regular.ttf');
-      final arabicBoldFontData = await rootBundle.load('assets/fonts/NotoNaskhArabic-Bold.ttf');
-      _arabicFont = pw.Font.ttf(arabicFontData);
-      _arabicBoldFont = pw.Font.ttf(arabicBoldFontData);
+      final fontData = await rootBundle.load('assets/fonts/NotoNaskhArabic-Regular.ttf');
+      _arabicFont = pw.Font.ttf(fontData);
+    } catch (e1) {
+      try {
+        final fontData = await rootBundle.load('assets/fonts/NotoNaskhArabic-SemiBold.ttf');
+        _arabicFont = pw.Font.ttf(fontData);
+      } catch (e2) {
+        // استخدام خط مدمج من Google Fonts عبر الإنترنت كحل أخير
+        _arabicFont = pw.Font.courier();
+      }
+    }
+
+    try {
+      final boldData = await rootBundle.load('assets/fonts/NotoNaskhArabic-SemiBold.ttf');
+      _arabicBoldFont = pw.Font.ttf(boldData);
     } catch (e) {
-      _arabicFont = pw.Font.helvetica();
-      _arabicBoldFont = pw.Font.helveticaBold();
+      _arabicBoldFont = _arabicFont;
     }
   }
 
-  pw.Font _getFont({bool bold = false}) {
-    if (_arabicFont != null && bold && _arabicBoldFont != null) return _arabicBoldFont!;
-    if (_arabicFont != null) return _arabicFont!;
-    return bold ? pw.Font.helveticaBold() : pw.Font.helvetica();
-  }
-
+  // ============ تقرير يومي ============
   Future<String> generateDailyReport({
     required String date,
     required bool isArabic,
@@ -44,32 +50,37 @@ class PdfService {
     final stats = await dbHelper.getDailyStatistics(date);
     final transactions = await dbHelper.getTransactionsByDate(date);
     final walletStats = await dbHelper.getWalletStatistics(date);
-    final categoryStats = (stats['category_stats'] as List<dynamic>?)?.map((e) => e as Map<String, dynamic>).toList() ?? [];
+    final categoryStats = (stats['category_stats'] as List<dynamic>?)
+        ?.map((e) => e as Map<String, dynamic>)
+        .toList() ??
+        [];
 
     final pdf = pw.Document();
     final numberFormat = NumberFormat('#,###', isArabic ? 'ar' : 'en');
     final dateObj = DateTime.parse(date);
-    final dateStr = DateFormat('EEEE d MMMM yyyy', isArabic ? 'ar' : 'en').format(dateObj);
+    final dateStr =
+    DateFormat('EEEE d MMMM yyyy', isArabic ? 'ar' : 'en').format(dateObj);
 
-    final font = _getFont();
-    final boldFont = _getFont(bold: true);
+    final font = _arabicFont ?? pw.Font.courier();
+    final boldFont = _arabicBoldFont ?? _arabicFont ?? pw.Font.courier();
 
-    pdf.addPage(
-      pw.MultiPage(
-        pageFormat: PdfPageFormat.a4,
-        textDirection: isArabic ? pw.TextDirection.rtl : pw.TextDirection.ltr,
-        theme: pw.ThemeData(defaultTextStyle: pw.TextStyle(font: font)),
-        build: (context) => [
-          _buildHeader(dateStr, isArabic, font, boldFont),
-          pw.SizedBox(height: 20),
-          _buildSummarySection(stats, categoryStats, walletStats, numberFormat, isArabic, font, boldFont),
-          pw.SizedBox(height: 20),
-          _buildTransactionsTable(transactions, numberFormat, isArabic, font, boldFont),
-          pw.SizedBox(height: 30),
-          _buildFooter(isArabic, font, boldFont),
-        ],
+    pdf.addPage(pw.MultiPage(
+      pageFormat: PdfPageFormat.a4,
+      textDirection: isArabic ? pw.TextDirection.rtl : pw.TextDirection.ltr,
+      theme: pw.ThemeData(
+        defaultTextStyle: pw.TextStyle(font: font, fontSize: 11),
       ),
-    );
+      build: (context) => [
+        _buildHeader(dateStr, isArabic, boldFont),
+        pw.SizedBox(height: 15),
+        _buildSummarySection(
+            stats, categoryStats, walletStats, numberFormat, isArabic, font, boldFont),
+        pw.SizedBox(height: 15),
+        _buildTransactionsTable(transactions, numberFormat, isArabic, font, boldFont),
+        pw.SizedBox(height: 25),
+        _buildFooter(isArabic, font, boldFont),
+      ],
+    ));
 
     final output = await getTemporaryDirectory();
     final file = File('${output.path}/report_$date.pdf');
@@ -77,6 +88,7 @@ class PdfService {
     return file.path;
   }
 
+  // ============ تقرير شهري ============
   Future<String> generateMonthlyReport({
     required int year,
     required int month,
@@ -92,27 +104,33 @@ class PdfService {
     final pdf = pw.Document();
     final numberFormat = NumberFormat('#,###', isArabic ? 'ar' : 'en');
 
-    const arabicMonths = ['', 'يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'];
-    const englishMonths = ['', 'January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+    const arabicMonths = [
+      '', 'يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو',
+      'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'
+    ];
+    const englishMonths = [
+      '', 'January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December'
+    ];
     final monthName = isArabic ? arabicMonths[month] : englishMonths[month];
 
-    final font = _getFont();
-    final boldFont = _getFont(bold: true);
+    final font = _arabicFont ?? pw.Font.courier();
+    final boldFont = _arabicBoldFont ?? _arabicFont ?? pw.Font.courier();
 
-    pdf.addPage(
-      pw.MultiPage(
-        pageFormat: PdfPageFormat.a4,
-        textDirection: isArabic ? pw.TextDirection.rtl : pw.TextDirection.ltr,
-        theme: pw.ThemeData(defaultTextStyle: pw.TextStyle(font: font)),
-        build: (context) => [
-          _buildHeader('$monthName $year', isArabic, font, boldFont),
-          pw.SizedBox(height: 20),
-          _buildMonthlySummary(stats, walletStats, numberFormat, isArabic, font, boldFont),
-          pw.SizedBox(height: 30),
-          _buildFooter(isArabic, font, boldFont),
-        ],
+    pdf.addPage(pw.MultiPage(
+      pageFormat: PdfPageFormat.a4,
+      textDirection: isArabic ? pw.TextDirection.rtl : pw.TextDirection.ltr,
+      theme: pw.ThemeData(
+        defaultTextStyle: pw.TextStyle(font: font, fontSize: 11),
       ),
-    );
+      build: (context) => [
+        _buildHeader('$monthName $year', isArabic, boldFont),
+        pw.SizedBox(height: 15),
+        _buildMonthlySummary(stats, walletStats, numberFormat, isArabic, font, boldFont),
+        pw.SizedBox(height: 25),
+        _buildFooter(isArabic, font, boldFont),
+      ],
+    ));
 
     final output = await getTemporaryDirectory();
     final file = File('${output.path}/report_${year}_$month.pdf');
@@ -120,6 +138,7 @@ class PdfService {
     return file.path;
   }
 
+  // ============ تقرير مخصص ============
   Future<String> generateCustomReport({
     required String startDate,
     required String endDate,
@@ -129,36 +148,43 @@ class PdfService {
   }) async {
     await _loadFonts();
 
-    final transactions = await dbHelper.getTransactionsByDateRange(startDate, endDate);
-    final totalAmount = transactions.fold<double>(0, (sum, t) => sum + ((t['amount'] as num?)?.toDouble() ?? 0));
+    final transactions =
+    await dbHelper.getTransactionsByDateRange(startDate, endDate);
+    final totalAmount = transactions.fold<double>(
+        0, (sum, t) => sum + ((t['amount'] as num?)?.toDouble() ?? 0));
 
     final pdf = pw.Document();
     final numberFormat = NumberFormat('#,###', isArabic ? 'ar' : 'en');
 
-    final font = _getFont();
-    final boldFont = _getFont(bold: true);
+    final font = _arabicFont ?? pw.Font.courier();
+    final boldFont = _arabicBoldFont ?? _arabicFont ?? pw.Font.courier();
 
-    pdf.addPage(
-      pw.MultiPage(
-        pageFormat: PdfPageFormat.a4,
-        textDirection: isArabic ? pw.TextDirection.rtl : pw.TextDirection.ltr,
-        theme: pw.ThemeData(defaultTextStyle: pw.TextStyle(font: font)),
-        build: (context) => [
-          _buildHeader('$startDate - $endDate', isArabic, font, boldFont),
-          pw.SizedBox(height: 20),
-          pw.Text(
-            '${isArabic ? "الإجمالي" : "Total"}: ${numberFormat.format(totalAmount)}',
-            style: pw.TextStyle(font: boldFont, fontSize: 18),
-          ),
-          pw.SizedBox(height: 10),
-          pw.Text('${isArabic ? "عدد العمليات" : "Transactions"}: ${transactions.length}'),
-          pw.SizedBox(height: 20),
-          _buildTransactionsTable(transactions, numberFormat, isArabic, font, boldFont),
-          pw.SizedBox(height: 30),
-          _buildFooter(isArabic, font, boldFont),
-        ],
+    pdf.addPage(pw.MultiPage(
+      pageFormat: PdfPageFormat.a4,
+      textDirection: isArabic ? pw.TextDirection.rtl : pw.TextDirection.ltr,
+      theme: pw.ThemeData(
+        defaultTextStyle: pw.TextStyle(font: font, fontSize: 11),
       ),
-    );
+      build: (context) => [
+        _buildHeader('$startDate - $endDate', isArabic, boldFont),
+        pw.SizedBox(height: 15),
+        pw.Text(
+          '${isArabic ? "الإجمالي" : "Total"}: ${numberFormat.format(totalAmount)}',
+          style: pw.TextStyle(font: boldFont, fontSize: 16),
+          textDirection: isArabic ? pw.TextDirection.rtl : pw.TextDirection.ltr,
+        ),
+        pw.SizedBox(height: 8),
+        pw.Text(
+          '${isArabic ? "عدد العمليات" : "Transactions"}: ${transactions.length}',
+          style: pw.TextStyle(font: font, fontSize: 11),
+          textDirection: isArabic ? pw.TextDirection.rtl : pw.TextDirection.ltr,
+        ),
+        pw.SizedBox(height: 15),
+        _buildTransactionsTable(transactions, numberFormat, isArabic, font, boldFont),
+        pw.SizedBox(height: 25),
+        _buildFooter(isArabic, font, boldFont),
+      ],
+    ));
 
     final output = await getTemporaryDirectory();
     final file = File('${output.path}/report_custom.pdf');
@@ -166,17 +192,43 @@ class PdfService {
     return file.path;
   }
 
-  pw.Widget _buildHeader(String title, bool isArabic, pw.Font font, pw.Font boldFont) {
-    return pw.Column(
-      crossAxisAlignment: isArabic ? pw.CrossAxisAlignment.end : pw.CrossAxisAlignment.start,
-      children: [
-        pw.Text('مدير المحافظ', style: pw.TextStyle(font: boldFont, fontSize: 24)),
-        pw.Text(title, style: pw.TextStyle(font: font, fontSize: 16)),
-        pw.Divider(),
-      ],
+  // ============ HEADER ============
+  pw.Widget _buildHeader(String title, bool isArabic, pw.Font boldFont) {
+    return pw.Container(
+      decoration: pw.BoxDecoration(
+        border: pw.Border(bottom: pw.BorderSide(color: PdfColors.grey, width: 1)),
+      ),
+      padding: const pw.EdgeInsets.only(bottom: 10),
+      child: pw.Column(
+        crossAxisAlignment:
+        isArabic ? pw.CrossAxisAlignment.end : pw.CrossAxisAlignment.start,
+        children: [
+          pw.Text(
+            isArabic ? 'مدير المحافظ' : 'Wallet Manager',
+            style: pw.TextStyle(font: boldFont, fontSize: 22),
+            textDirection:
+            isArabic ? pw.TextDirection.rtl : pw.TextDirection.ltr,
+          ),
+          pw.SizedBox(height: 4),
+          pw.Text(
+            isArabic ? 'تقرير المبيعات' : 'Sales Report',
+            style: pw.TextStyle(font: boldFont, fontSize: 16),
+            textDirection:
+            isArabic ? pw.TextDirection.rtl : pw.TextDirection.ltr,
+          ),
+          pw.SizedBox(height: 4),
+          pw.Text(
+            title,
+            style: pw.TextStyle(font: boldFont, fontSize: 13, color: PdfColors.grey700),
+            textDirection:
+            isArabic ? pw.TextDirection.rtl : pw.TextDirection.ltr,
+          ),
+        ],
+      ),
     );
   }
 
+  // ============ SUMMARY ============
   pw.Widget _buildSummarySection(
       Map<String, dynamic> stats,
       List<Map<String, dynamic>> categoryStats,
@@ -186,31 +238,141 @@ class PdfService {
       pw.Font font,
       pw.Font boldFont,
       ) {
-    return pw.Column(
-      crossAxisAlignment: isArabic ? pw.CrossAxisAlignment.end : pw.CrossAxisAlignment.start,
-      children: [
-        pw.Text(isArabic ? 'الملخص' : 'Summary', style: pw.TextStyle(font: boldFont, fontSize: 18)),
-        pw.SizedBox(height: 10),
-        pw.Text('${isArabic ? "الإجمالي" : "Total"}: ${numberFormat.format(stats['total'] ?? 0)}',
-            style: pw.TextStyle(font: boldFont)),
-        pw.SizedBox(height: 10),
-        if (categoryStats.isNotEmpty) ...[
-          pw.Text(isArabic ? 'أنواع العمليات' : 'Categories', style: pw.TextStyle(font: boldFont, fontSize: 14)),
-          ...categoryStats.map((c) => pw.Text(
-            '${c['category_name'] ?? ''}: ${numberFormat.format((c['total'] as num?)?.toDouble() ?? 0)}',
-            style: pw.TextStyle(font: font),
-          )),
+    return pw.Container(
+      decoration: pw.BoxDecoration(
+        border: pw.Border.all(color: PdfColors.grey300, width: 0.5),
+        borderRadius: pw.BorderRadius.circular(4),
+      ),
+      padding: const pw.EdgeInsets.all(12),
+      child: pw.Column(
+        crossAxisAlignment:
+        isArabic ? pw.CrossAxisAlignment.end : pw.CrossAxisAlignment.start,
+        children: [
+          // العنوان
+          pw.Text(
+            isArabic ? 'ملخص التقرير' : 'Summary',
+            style: pw.TextStyle(font: boldFont, fontSize: 15),
+            textDirection:
+            isArabic ? pw.TextDirection.rtl : pw.TextDirection.ltr,
+          ),
+          pw.SizedBox(height: 8),
+          pw.Divider(),
+          pw.SizedBox(height: 8),
+
+          // الإجمالي
+          pw.Row(
+            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+            children: [
+              pw.Text(
+                isArabic ? 'الإجمالي العام' : 'Total',
+                style: pw.TextStyle(font: boldFont, fontSize: 12),
+                textDirection:
+                isArabic ? pw.TextDirection.rtl : pw.TextDirection.ltr,
+              ),
+              pw.Text(
+                numberFormat.format(stats['total'] ?? 0),
+                style: pw.TextStyle(font: boldFont, fontSize: 12),
+                textDirection:
+                isArabic ? pw.TextDirection.rtl : pw.TextDirection.ltr,
+              ),
+            ],
+          ),
+          pw.SizedBox(height: 4),
+          pw.Row(
+            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+            children: [
+              pw.Text(
+                isArabic ? 'عدد العمليات' : 'Transactions',
+                style: pw.TextStyle(font: font, fontSize: 11),
+                textDirection:
+                isArabic ? pw.TextDirection.rtl : pw.TextDirection.ltr,
+              ),
+              pw.Text(
+                '${stats['count'] ?? 0}',
+                style: pw.TextStyle(font: font, fontSize: 11),
+                textDirection:
+                isArabic ? pw.TextDirection.rtl : pw.TextDirection.ltr,
+              ),
+            ],
+          ),
+
+          // أنواع العمليات
+          if (categoryStats.isNotEmpty) ...[
+            pw.SizedBox(height: 10),
+            pw.Divider(),
+            pw.SizedBox(height: 8),
+            pw.Text(
+              isArabic ? 'تفاصيل أنواع العمليات' : 'Category Details',
+              style: pw.TextStyle(font: boldFont, fontSize: 12),
+              textDirection:
+              isArabic ? pw.TextDirection.rtl : pw.TextDirection.ltr,
+            ),
+            pw.SizedBox(height: 6),
+            ...categoryStats.map((c) => pw.Padding(
+              padding: const pw.EdgeInsets.symmetric(vertical: 2),
+              child: pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                children: [
+                  pw.Text(
+                    '${c['category_name'] ?? ''}',
+                    style: pw.TextStyle(font: font, fontSize: 11),
+                    textDirection: isArabic
+                        ? pw.TextDirection.rtl
+                        : pw.TextDirection.ltr,
+                  ),
+                  pw.Text(
+                    numberFormat
+                        .format((c['total'] as num?)?.toDouble() ?? 0),
+                    style: pw.TextStyle(font: font, fontSize: 11),
+                    textDirection: isArabic
+                        ? pw.TextDirection.rtl
+                        : pw.TextDirection.ltr,
+                  ),
+                ],
+              ),
+            )),
+          ],
+
+          // المحافظ
           pw.SizedBox(height: 10),
+          pw.Divider(),
+          pw.SizedBox(height: 8),
+          pw.Text(
+            isArabic ? 'المحافظ' : 'Wallets',
+            style: pw.TextStyle(font: boldFont, fontSize: 12),
+            textDirection:
+            isArabic ? pw.TextDirection.rtl : pw.TextDirection.ltr,
+          ),
+          pw.SizedBox(height: 6),
+          ...walletStats.map((w) => pw.Padding(
+            padding: const pw.EdgeInsets.symmetric(vertical: 2),
+            child: pw.Row(
+              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+              children: [
+                pw.Text(
+                  '${w['name'] ?? ''}',
+                  style: pw.TextStyle(font: font, fontSize: 11),
+                  textDirection: isArabic
+                      ? pw.TextDirection.rtl
+                      : pw.TextDirection.ltr,
+                ),
+                pw.Text(
+                  numberFormat
+                      .format((w['total'] as num?)?.toDouble() ?? 0),
+                  style: pw.TextStyle(font: font, fontSize: 11),
+                  textDirection: isArabic
+                      ? pw.TextDirection.rtl
+                      : pw.TextDirection.ltr,
+                ),
+              ],
+            ),
+          )),
         ],
-        pw.Text(isArabic ? 'المحافظ' : 'Wallets', style: pw.TextStyle(font: boldFont, fontSize: 14)),
-        ...walletStats.map((w) => pw.Text(
-          '${w['name'] ?? ''}: ${numberFormat.format((w['total'] as num?)?.toDouble() ?? 0)}',
-          style: pw.TextStyle(font: font),
-        )),
-      ],
+      ),
     );
   }
 
+  // ============ MONTHLY SUMMARY ============
   pw.Widget _buildMonthlySummary(
       Map<String, dynamic> stats,
       List<Map<String, dynamic>> walletStats,
@@ -219,25 +381,76 @@ class PdfService {
       pw.Font font,
       pw.Font boldFont,
       ) {
-    return pw.Column(
-      crossAxisAlignment: isArabic ? pw.CrossAxisAlignment.end : pw.CrossAxisAlignment.start,
-      children: [
-        pw.Text(isArabic ? 'الملخص' : 'Summary', style: pw.TextStyle(font: boldFont, fontSize: 18)),
-        pw.SizedBox(height: 10),
-        pw.Text('${isArabic ? "الإجمالي" : "Total"}: ${numberFormat.format(stats['total'] ?? 0)}',
-            style: pw.TextStyle(font: boldFont)),
-        pw.Text('${isArabic ? "عدد العمليات" : "Transactions"}: ${stats['count'] ?? 0}'),
-        pw.Text('${isArabic ? "أيام العمل" : "Working days"}: ${stats['days_count'] ?? 0}'),
-        pw.SizedBox(height: 10),
-        pw.Text(isArabic ? 'المحافظ' : 'Wallets', style: pw.TextStyle(font: boldFont, fontSize: 14)),
-        ...walletStats.map((w) => pw.Text(
-          '${w['name'] ?? ''}: ${numberFormat.format((w['total'] as num?)?.toDouble() ?? 0)}',
-          style: pw.TextStyle(font: font),
-        )),
-      ],
+    return pw.Container(
+      decoration: pw.BoxDecoration(
+        border: pw.Border.all(color: PdfColors.grey300, width: 0.5),
+        borderRadius: pw.BorderRadius.circular(4),
+      ),
+      padding: const pw.EdgeInsets.all(12),
+      child: pw.Column(
+        crossAxisAlignment:
+        isArabic ? pw.CrossAxisAlignment.end : pw.CrossAxisAlignment.start,
+        children: [
+          pw.Text(
+            isArabic ? 'ملخص الشهر' : 'Monthly Summary',
+            style: pw.TextStyle(font: boldFont, fontSize: 15),
+            textDirection:
+            isArabic ? pw.TextDirection.rtl : pw.TextDirection.ltr,
+          ),
+          pw.SizedBox(height: 8),
+          pw.Divider(),
+          pw.SizedBox(height: 8),
+          _summaryRow(isArabic ? 'الإجمالي' : 'Total',
+              numberFormat.format(stats['total'] ?? 0), boldFont, isArabic),
+          _summaryRow(isArabic ? 'عدد العمليات' : 'Transactions',
+              '${stats['count'] ?? 0}', font, isArabic),
+          _summaryRow(isArabic ? 'أيام العمل' : 'Working Days',
+              '${stats['days_count'] ?? 0}', font, isArabic),
+          pw.SizedBox(height: 10),
+          pw.Divider(),
+          pw.SizedBox(height: 8),
+          pw.Text(
+            isArabic ? 'المحافظ' : 'Wallets',
+            style: pw.TextStyle(font: boldFont, fontSize: 12),
+            textDirection:
+            isArabic ? pw.TextDirection.rtl : pw.TextDirection.ltr,
+          ),
+          pw.SizedBox(height: 6),
+          ...walletStats.map((w) => _summaryRow(
+              '${w['name'] ?? ''}',
+              numberFormat.format((w['total'] as num?)?.toDouble() ?? 0),
+              font,
+              isArabic)),
+        ],
+      ),
     );
   }
 
+  pw.Widget _summaryRow(
+      String label, String value, pw.Font font, bool isArabic) {
+    return pw.Padding(
+      padding: const pw.EdgeInsets.symmetric(vertical: 2),
+      child: pw.Row(
+        mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+        children: [
+          pw.Text(
+            label,
+            style: pw.TextStyle(font: font, fontSize: 11),
+            textDirection:
+            isArabic ? pw.TextDirection.rtl : pw.TextDirection.ltr,
+          ),
+          pw.Text(
+            value,
+            style: pw.TextStyle(font: font, fontSize: 11),
+            textDirection:
+            isArabic ? pw.TextDirection.rtl : pw.TextDirection.ltr,
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ============ TRANSACTIONS TABLE ============
   pw.Widget _buildTransactionsTable(
       List<Map<String, dynamic>> transactions,
       NumberFormat numberFormat,
@@ -246,39 +459,72 @@ class PdfService {
       pw.Font boldFont,
       ) {
     if (transactions.isEmpty) {
-      return pw.Text(isArabic ? 'لا توجد عمليات' : 'No transactions', style: pw.TextStyle(font: font));
+      return pw.Container(
+        padding: const pw.EdgeInsets.all(20),
+        child: pw.Text(
+          isArabic ? 'لا توجد عمليات' : 'No transactions',
+          style: pw.TextStyle(font: font, fontSize: 12),
+          textDirection:
+          isArabic ? pw.TextDirection.rtl : pw.TextDirection.ltr,
+        ),
+      );
     }
 
     return pw.Column(
-      crossAxisAlignment: isArabic ? pw.CrossAxisAlignment.end : pw.CrossAxisAlignment.start,
+      crossAxisAlignment:
+      isArabic ? pw.CrossAxisAlignment.end : pw.CrossAxisAlignment.start,
       children: [
-        pw.Text(isArabic ? 'العمليات' : 'Transactions', style: pw.TextStyle(font: boldFont, fontSize: 16)),
-        pw.SizedBox(height: 10),
+        pw.Text(
+          isArabic ? 'سجل العمليات' : 'Transactions Log',
+          style: pw.TextStyle(font: boldFont, fontSize: 15),
+          textDirection:
+          isArabic ? pw.TextDirection.rtl : pw.TextDirection.ltr,
+        ),
+        pw.SizedBox(height: 8),
         pw.Table(
-          border: pw.TableBorder.all(),
+          border: pw.TableBorder.all(color: PdfColors.grey400, width: 0.5),
+          columnWidths: {
+            0: const pw.FlexColumnWidth(1.5),
+            1: const pw.FlexColumnWidth(2),
+            2: const pw.FlexColumnWidth(2),
+            3: const pw.FlexColumnWidth(1.5),
+          },
           children: [
+            // رأس الجدول
             pw.TableRow(
+              decoration: pw.BoxDecoration(color: PdfColors.grey200),
               children: [
-                _tableCell(isArabic ? 'الوقت' : 'Time', true, boldFont),
-                _tableCell(isArabic ? 'النوع' : 'Type', true, boldFont),
-                _tableCell(isArabic ? 'المحفظة' : 'Wallet', true, boldFont),
-                _tableCell(isArabic ? 'المبلغ' : 'Amount', true, boldFont),
+                _tableCell(
+                    isArabic ? 'الوقت' : 'Time', true, boldFont, isArabic),
+                _tableCell(
+                    isArabic ? 'النوع' : 'Type', true, boldFont, isArabic),
+                _tableCell(isArabic ? 'المحفظة' : 'Wallet', true, boldFont,
+                    isArabic),
+                _tableCell(isArabic ? 'المبلغ' : 'Amount', true, boldFont,
+                    isArabic),
               ],
             ),
-            ...transactions.map((t) {
+            // بيانات الجدول
+            ...transactions.asMap().entries.map((entry) {
+              final index = entry.key;
+              final t = entry.value;
               final time = t['created_at'] != null
-                  ? DateFormat('hh:mm a', isArabic ? 'ar' : 'en').format(DateTime.parse(t['created_at'] as String))
+                  ? DateFormat('hh:mm a', isArabic ? 'ar' : 'en')
+                  .format(DateTime.parse(t['created_at'] as String))
                   : '';
-              final type = (t['category_name'] as String?) ?? (t['custom_name'] as String?) ?? '';
+              final type =
+                  (t['category'] as String?) ?? (t['custom_name'] as String?) ?? '';
               final walletName = (t['wallet_name'] as String?) ?? '';
               final amount = (t['amount'] as num?)?.toDouble() ?? 0;
+              final bgColor = index.isEven ? PdfColors.white : PdfColors.grey50;
 
               return pw.TableRow(
+                decoration: pw.BoxDecoration(color: bgColor),
                 children: [
-                  _tableCell(time, false, font),
-                  _tableCell(type, false, font),
-                  _tableCell(walletName, false, font),
-                  _tableCell(numberFormat.format(amount), false, font),
+                  _tableCell(time, false, font, isArabic),
+                  _tableCell(type, false, font, isArabic),
+                  _tableCell(walletName, false, font, isArabic),
+                  _tableCell(numberFormat.format(amount), false, font, isArabic),
                 ],
               );
             }),
@@ -288,27 +534,60 @@ class PdfService {
     );
   }
 
-  pw.Widget _tableCell(String text, bool isHeader, pw.Font font) {
+  pw.Widget _tableCell(
+      String text, bool isHeader, pw.Font font, bool isArabic) {
     return pw.Padding(
-      padding: const pw.EdgeInsets.all(4),
+      padding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 5),
       child: pw.Text(
         text,
-        style: pw.TextStyle(font: font, fontSize: 10, fontWeight: isHeader ? pw.FontWeight.bold : pw.FontWeight.normal),
+        style: pw.TextStyle(
+          font: font,
+          fontSize: 9,
+          fontWeight: isHeader ? pw.FontWeight.bold : pw.FontWeight.normal,
+        ),
+        textDirection: isArabic ? pw.TextDirection.rtl : pw.TextDirection.ltr,
+        textAlign: isArabic ? pw.TextAlign.right : pw.TextAlign.left,
       ),
     );
   }
 
+  // ============ FOOTER ============
   pw.Widget _buildFooter(bool isArabic, pw.Font font, pw.Font boldFont) {
-    return pw.Column(
-      crossAxisAlignment: isArabic ? pw.CrossAxisAlignment.end : pw.CrossAxisAlignment.start,
-      children: [
-        pw.Divider(),
-        pw.Text('أسامة علي', style: pw.TextStyle(font: boldFont)),
-        pw.Text('Software Developer', style: pw.TextStyle(font: font)),
-        pw.Text('+967 780 155 801', style: pw.TextStyle(font: font)),
-      ],
+    return pw.Container(
+      decoration: pw.BoxDecoration(
+        border: pw.Border(top: pw.BorderSide(color: PdfColors.grey, width: 0.5)),
+      ),
+      padding: const pw.EdgeInsets.only(top: 10),
+      child: pw.Column(
+        crossAxisAlignment:
+        isArabic ? pw.CrossAxisAlignment.end : pw.CrossAxisAlignment.start,
+        children: [
+          pw.Text(
+            'أسامة علي',
+            style: pw.TextStyle(font: boldFont, fontSize: 11),
+            textDirection:
+            isArabic ? pw.TextDirection.rtl : pw.TextDirection.ltr,
+          ),
+          pw.SizedBox(height: 2),
+          pw.Text(
+            'Software Developer',
+            style: pw.TextStyle(font: font, fontSize: 9, color: PdfColors.grey700),
+            textDirection:
+            isArabic ? pw.TextDirection.rtl : pw.TextDirection.ltr,
+          ),
+          pw.SizedBox(height: 2),
+          pw.Text(
+            '+967 780 155 801',
+            style: pw.TextStyle(font: font, fontSize: 9, color: PdfColors.grey700),
+            textDirection:
+            isArabic ? pw.TextDirection.rtl : pw.TextDirection.ltr,
+          ),
+        ],
+      ),
     );
   }
+
+  // ============ طباعة ومشاركة ============
 
   Future<void> printDailyReport({
     required String date,
@@ -316,8 +595,15 @@ class PdfService {
     required AppLocalizations l10n,
     required DatabaseHelper dbHelper,
   }) async {
-    final filePath = await generateDailyReport(date: date, isArabic: isArabic, l10n: l10n, dbHelper: dbHelper);
-    await Printing.layoutPdf(onLayout: (format) async => await File(filePath).readAsBytes());
+    final filePath = await generateDailyReport(
+      date: date,
+      isArabic: isArabic,
+      l10n: l10n,
+      dbHelper: dbHelper,
+    );
+    await Printing.layoutPdf(
+      onLayout: (format) async => await File(filePath).readAsBytes(),
+    );
   }
 
   Future<void> printCustomReport({
@@ -327,8 +613,16 @@ class PdfService {
     required AppLocalizations l10n,
     required DatabaseHelper dbHelper,
   }) async {
-    final filePath = await generateCustomReport(startDate: startDate, endDate: endDate, isArabic: isArabic, l10n: l10n, dbHelper: dbHelper);
-    await Printing.layoutPdf(onLayout: (format) async => await File(filePath).readAsBytes());
+    final filePath = await generateCustomReport(
+      startDate: startDate,
+      endDate: endDate,
+      isArabic: isArabic,
+      l10n: l10n,
+      dbHelper: dbHelper,
+    );
+    await Printing.layoutPdf(
+      onLayout: (format) async => await File(filePath).readAsBytes(),
+    );
   }
 
   Future<void> sharePdf(String filePath) async {

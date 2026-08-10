@@ -33,14 +33,42 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
   }
 
   Future<void> _loadData() async {
-    final categories = await _dbHelper.getActiveCategories();
-    final wallets = await _dbHelper.getActiveWallets();
-    if (mounted) {
-      setState(() {
-        _categories = categories;
-        _wallets = wallets;
-      });
+    try {
+      // ✅ تحميل الفئات من قاعدة البيانات
+      final categories = await _dbHelper.getActiveCategories();
+      final wallets = await _dbHelper.getActiveWallets();
+      if (mounted) {
+        setState(() {
+          _categories = categories;
+          _wallets = wallets;
+        });
+      }
+    } catch (e) {
+      // ✅ إذا فشل تحميل الفئات (الجدول غير موجود)، استخدم فئات افتراضية
+      if (mounted) {
+        setState(() {
+          _categories = [
+            {'id': 1, 'name': 'سمبوسة', 'icon_name': 'fastfood'},
+            {'id': 2, 'name': 'حلويات', 'icon_name': 'cake'},
+          ];
+          _wallets = [];
+        });
+      }
+      // تحميل المحافظ
+      try {
+        final wallets = await _dbHelper.getActiveWallets();
+        if (mounted) setState(() => _wallets = wallets);
+      } catch (e2) {}
     }
+  }
+
+  Color _getCategoryColor(int index) {
+    final colors = [
+      Colors.orange, Colors.pink, Colors.teal,
+      Colors.blue, Colors.purple, Colors.green,
+      Colors.red, Colors.amber, Colors.indigo, Colors.cyan,
+    ];
+    return colors[index % colors.length];
   }
 
   IconData _getIconData(String iconName) {
@@ -52,13 +80,9 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
       case 'shopping_bag': return Icons.shopping_bag;
       case 'build': return Icons.build;
       case 'handyman': return Icons.handyman;
+      case 'checkroom': return Icons.checkroom;
       default: return Icons.category;
     }
-  }
-
-  Color _getCategoryColor(int index) {
-    final colors = [Colors.orange, Colors.pink, Colors.teal, Colors.blue, Colors.purple, Colors.green, Colors.red, Colors.amber];
-    return colors[index % colors.length];
   }
 
   Future<void> _saveTransaction() async {
@@ -70,18 +94,18 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
       final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
       final recordId = await _dbHelper.createDailyRecordIfNotExists(today);
 
-      String categoryName;
+      // ✅ تحديد اسم الفئة
+      final String categoryName;
       if (_isCustom) {
         categoryName = _customNameController.text.trim();
       } else {
-        categoryName = _selectedCategoryName ?? '';
+        categoryName = _selectedCategoryName ?? 'أخرى';
       }
 
       await _dbHelper.addTransaction(
         dailyRecordId: recordId,
         walletId: _selectedWalletId!,
-        categoryId: _isCustom ? null : _selectedCategoryId,
-        categoryName: categoryName,
+        category: categoryName,
         customName: _isCustom ? _customNameController.text.trim() : null,
         amount: double.parse(_amountController.text),
         note: _noteController.text.isNotEmpty ? _noteController.text : null,
@@ -123,8 +147,11 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              // ============ نوع العملية ============
               Text(l10n.getString('category'), style: theme.textTheme.titleMedium),
               const SizedBox(height: 12),
+
+              // ✅ عرض جميع الفئات من قاعدة البيانات
               Wrap(
                 spacing: 8,
                 runSpacing: 8,
@@ -134,7 +161,8 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                     final cat = entry.value;
                     final isSelected = _selectedCategoryId == cat['id'] && !_isCustom;
                     final color = _getCategoryColor(index);
-                    final icon = _getIconData(cat['icon_name'] as String? ?? 'category');
+                    final iconName = cat['icon_name'] as String? ?? 'category';
+                    final icon = _getIconData(iconName);
 
                     return GestureDetector(
                       onTap: () {
@@ -149,7 +177,10 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                         elevation: isSelected ? 4 : 1,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
-                          side: BorderSide(color: isSelected ? color : Colors.transparent, width: 2),
+                          side: BorderSide(
+                            color: isSelected ? color : Colors.transparent,
+                            width: 2,
+                          ),
                         ),
                         child: Padding(
                           padding: const EdgeInsets.all(12),
@@ -157,18 +188,22 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                             children: [
                               Icon(icon, color: color, size: 32),
                               const SizedBox(height: 4),
-                              Text(cat['name'] as String, style: TextStyle(
-                                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                                color: isSelected ? color : null,
-                                fontSize: 12,
-                              )),
+                              Text(
+                                cat['name'] as String,
+                                style: TextStyle(
+                                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                  color: isSelected ? color : null,
+                                  fontSize: 12,
+                                ),
+                              ),
                             ],
                           ),
                         ),
                       ),
                     );
                   }),
-                  // زر عملية مخصصة
+
+                  // ✅ زر "أخرى" للعمليات المخصصة
                   GestureDetector(
                     onTap: () {
                       setState(() {
@@ -181,7 +216,10 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                       elevation: _isCustom ? 4 : 1,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
-                        side: BorderSide(color: _isCustom ? Colors.grey : Colors.transparent, width: 2),
+                        side: BorderSide(
+                          color: _isCustom ? Colors.grey : Colors.transparent,
+                          width: 2,
+                        ),
                       ),
                       child: const Padding(
                         padding: EdgeInsets.all(12),
@@ -198,6 +236,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                 ],
               ),
 
+              // ============ اسم العملية المخصصة ============
               if (_isCustom) ...[
                 const SizedBox(height: 24),
                 Text(l10n.getString('custom_name'), style: theme.textTheme.titleMedium),
@@ -210,7 +249,9 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                     hintText: l10n.getString('custom_name'),
                   ),
                   validator: (value) {
-                    if (value == null || value.trim().isEmpty) return l10n.getString('custom_name_required');
+                    if (value == null || value.trim().isEmpty) {
+                      return l10n.getString('custom_name_required');
+                    }
                     return null;
                   },
                 ),
@@ -218,6 +259,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
 
               const SizedBox(height: 24),
 
+              // ============ المحفظة ============
               Text(l10n.getString('wallet'), style: theme.textTheme.titleMedium),
               const SizedBox(height: 12),
               DropdownButtonFormField<int>(
@@ -226,15 +268,23 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                   prefixIcon: const Icon(Icons.account_balance_wallet),
                   hintText: l10n.getString('select_wallet'),
                 ),
-                items: _wallets.map((w) => DropdownMenuItem<int>(
-                  value: w['id'] as int,
-                  child: Text(w['name'] as String),
-                )).toList(),
-                onChanged: (value) => setState(() => _selectedWalletId = value),
-                validator: (value) => value == null ? l10n.getString('wallet_required') : null,
+                items: _wallets.map((w) {
+                  return DropdownMenuItem<int>(
+                    value: w['id'] as int,
+                    child: Text(w['name'] as String),
+                  );
+                }).toList(),
+                onChanged: (value) {
+                  setState(() => _selectedWalletId = value);
+                },
+                validator: (value) {
+                  if (value == null) return l10n.getString('wallet_required');
+                  return null;
+                },
               ),
               const SizedBox(height: 24),
 
+              // ============ المبلغ ============
               Text(l10n.getString('amount'), style: theme.textTheme.titleMedium),
               const SizedBox(height: 12),
               TextFormField(
@@ -247,15 +297,23 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                   suffixText: 'ريال',
                 ),
                 validator: (value) {
-                  if (value == null || value.isEmpty) return l10n.getString('amount_required');
+                  if (value == null || value.isEmpty) {
+                    return l10n.getString('amount_required');
+                  }
                   final amount = double.tryParse(value);
-                  if (amount == null || amount <= 0) return l10n.getString('amount_positive');
+                  if (amount == null || amount <= 0) {
+                    return l10n.getString('amount_positive');
+                  }
                   return null;
                 },
               ),
               const SizedBox(height: 24),
 
-              Text('${l10n.getString('note')} (${l10n.getString('optional')})', style: theme.textTheme.titleMedium),
+              // ============ ملاحظات ============
+              Text(
+                '${l10n.getString('note')} (${l10n.getString('optional')})',
+                style: theme.textTheme.titleMedium,
+              ),
               const SizedBox(height: 12),
               TextFormField(
                 controller: _noteController,
@@ -268,13 +326,25 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
               ),
               const SizedBox(height: 32),
 
+              // ============ زر الحفظ ============
               FilledButton.icon(
                 onPressed: _isLoading ? null : _saveTransaction,
                 icon: _isLoading
-                    ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                    ? const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Colors.white,
+                  ),
+                )
                     : const Icon(Icons.save),
-                label: Text(_isLoading ? l10n.getString('saving') : l10n.getString('save')),
-                style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16)),
+                label: Text(
+                  _isLoading ? l10n.getString('saving') : l10n.getString('save'),
+                ),
+                style: FilledButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                ),
               ),
             ],
           ),

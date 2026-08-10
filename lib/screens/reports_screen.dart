@@ -67,25 +67,17 @@ class _ReportsScreenState extends State<ReportsScreen> {
             const SizedBox(height: 24),
             Row(
               children: [
-                Expanded(
-                  child: _buildActionButton(Icons.print, 'طباعة', () => _printReport(isArabic, l10n)),
-                ),
+                Expanded(child: _buildActionButton(Icons.print, 'طباعة', () => _printReport(isArabic, l10n))),
                 const SizedBox(width: 8),
-                Expanded(
-                  child: _buildActionButton(Icons.picture_as_pdf, 'PDF', () => _generatePdf(isArabic, l10n)),
-                ),
+                Expanded(child: _buildActionButton(Icons.picture_as_pdf, 'PDF', () => _generatePdf(isArabic, l10n))),
               ],
             ),
             const SizedBox(height: 8),
             Row(
               children: [
-                Expanded(
-                  child: _buildActionButton(Icons.share, 'مشاركة PDF', () => _sharePdf(isArabic, l10n)),
-                ),
+                Expanded(child: _buildActionButton(Icons.share, 'مشاركة PDF', () => _sharePdf(isArabic, l10n))),
                 const SizedBox(width: 8),
-                Expanded(
-                  child: _buildActionButton(Icons.text_snippet, 'مشاركة كنص', () => _shareText(isArabic, l10n)),
-                ),
+                Expanded(child: _buildActionButton(Icons.text_snippet, 'مشاركة كنص', () => _shareText(isArabic, l10n))),
               ],
             ),
           ],
@@ -135,7 +127,8 @@ class _ReportsScreenState extends State<ReportsScreen> {
       );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: const Text('تم إنشاء PDF'),
+          SnackBar(
+            content: const Text('تم إنشاء PDF'),
             action: SnackBarAction(label: 'مشاركة', onPressed: () => pdfService.sharePdf(filePath)),
           ),
         );
@@ -184,18 +177,12 @@ class _ReportsScreenState extends State<ReportsScreen> {
     );
 
     final totalAmount = transactions.fold<double>(0, (sum, t) => sum + ((t['amount'] as num?)?.toDouble() ?? 0));
-    final sambousaTotal = transactions.where((t) => t['category'] == 'sambousa').fold<double>(0, (sum, t) => sum + ((t['amount'] as num?)?.toDouble() ?? 0));
-    final sweetsTotal = transactions.where((t) => t['category'] == 'sweets').fold<double>(0, (sum, t) => sum + ((t['amount'] as num?)?.toDouble() ?? 0));
-    final customTotal = transactions.where((t) => t['category'] == 'custom').fold<double>(0, (sum, t) => sum + ((t['amount'] as num?)?.toDouble() ?? 0));
 
     final buffer = StringBuffer();
     buffer.writeln('📊 ${isArabic ? "تقرير المبيعات" : "Sales Report"}');
     buffer.writeln('📅 ${DateFormat('yyyy-MM-dd').format(_startDate)} - ${DateFormat('yyyy-MM-dd').format(_endDate)}');
     buffer.writeln('━━━━━━━━━━━━');
     buffer.writeln('💰 ${isArabic ? "الإجمالي" : "Total"}: ${numberFormat.format(totalAmount)}');
-    buffer.writeln('🥟 ${l10n.getString('sambousa')}: ${numberFormat.format(sambousaTotal)}');
-    buffer.writeln('🍰 ${l10n.getString('sweets')}: ${numberFormat.format(sweetsTotal)}');
-    buffer.writeln('📦 ${l10n.getString('other')}: ${numberFormat.format(customTotal)}');
     buffer.writeln('━━━━━━━━━━━━');
     buffer.writeln('${isArabic ? "عدد العمليات" : "Transactions"}: ${transactions.length}');
     buffer.writeln();

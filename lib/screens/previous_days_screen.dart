@@ -25,10 +25,12 @@ class _PreviousDaysScreenState extends State<PreviousDaysScreen> {
   Future<void> _loadRecords() async {
     setState(() => _isLoading = true);
     final records = await _dbHelper.getAllDailyRecords();
-    setState(() {
-      _records = records;
-      _isLoading = false;
-    });
+    if (mounted) {
+      setState(() {
+        _records = records;
+        _isLoading = false;
+      });
+    }
   }
 
   @override
@@ -38,9 +40,7 @@ class _PreviousDaysScreenState extends State<PreviousDaysScreen> {
     final theme = Theme.of(context);
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('الأيام السابقة'),
-      ),
+      appBar: AppBar(title: const Text('الأيام السابقة')),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _records.isEmpty
@@ -60,7 +60,7 @@ class _PreviousDaysScreenState extends State<PreviousDaysScreen> {
         itemCount: _records.length,
         itemBuilder: (context, index) {
           final record = _records[index];
-          final date = DateTime.parse(record['business_date']);
+          final date = DateTime.parse(record['business_date'] as String);
           final dateStr = DateFormat('EEEE d MMMM yyyy', isArabic ? 'ar' : 'en').format(date);
           final total = (record['total_amount'] as num?)?.toDouble() ?? 0;
           final count = record['transaction_count'] ?? 0;
@@ -83,7 +83,7 @@ class _PreviousDaysScreenState extends State<PreviousDaysScreen> {
                   context,
                   MaterialPageRoute(
                     builder: (context) => DayDetailsScreen(
-                      date: record['business_date'],
+                      date: record['business_date'] as String,
                     ),
                   ),
                 );

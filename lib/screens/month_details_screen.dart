@@ -35,17 +35,25 @@ class _MonthDetailsScreenState extends State<MonthDetailsScreen> {
     final walletStats = await _dbHelper.getWalletStatisticsByMonth(widget.year, widget.month);
     final records = await _dbHelper.getRecordsByMonth(widget.year, widget.month);
 
-    setState(() {
-      _monthStats = monthStats;
-      _walletStats = walletStats;
-      _records = records;
-      _isLoading = false;
-    });
+    if (mounted) {
+      setState(() {
+        _monthStats = monthStats;
+        _walletStats = walletStats;
+        _records = records;
+        _isLoading = false;
+      });
+    }
   }
 
   String _getMonthName(int month, bool isArabic) {
-    const arabicMonths = ['', 'يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'];
-    const englishMonths = ['', 'January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+    const arabicMonths = [
+      '', 'يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو',
+      'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'
+    ];
+    const englishMonths = [
+      '', 'January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December'
+    ];
     return isArabic ? arabicMonths[month] : englishMonths[month];
   }
 
@@ -84,75 +92,105 @@ class _MonthDetailsScreenState extends State<MonthDetailsScreen> {
                     Text(
                       numberFormat.format(_monthStats['total'] ?? 0),
                       style: theme.textTheme.headlineLarge?.copyWith(
-                          fontWeight: FontWeight.bold, color: theme.colorScheme.primary),
+                        fontWeight: FontWeight.bold,
+                        color: theme.colorScheme.primary,
+                      ),
                     ),
                     const SizedBox(height: 12),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceAround,
                       children: [
-                        _buildMiniStat(l10n.getString('sambousa'),
-                            numberFormat.format(_monthStats['sambousa'] ?? 0), Colors.orange),
-                        _buildMiniStat(l10n.getString('sweets'),
-                            numberFormat.format(_monthStats['sweets'] ?? 0), Colors.pink),
-                        _buildMiniStat(l10n.getString('other'),
-                            numberFormat.format(_monthStats['custom_total'] ?? 0), Colors.teal),
-                        _buildMiniStat(l10n.getString('operations_count'),
-                            '${_monthStats['count'] ?? 0}', Colors.blue),
+                        _buildMiniStat(
+                          l10n.getString('operations_count'),
+                          '${_monthStats['count'] ?? 0}',
+                          Colors.blue,
+                        ),
+                        _buildMiniStat(
+                          isArabic ? 'أيام العمل' : 'Days',
+                          '${_monthStats['days_count'] ?? 0}',
+                          Colors.green,
+                        ),
                       ],
                     ),
-                    const SizedBox(height: 8),
-                    Text('${_monthStats['days_count'] ?? 0} ${isArabic ? "يوم عمل" : "working days"}',
-                        style: theme.textTheme.bodySmall),
                   ],
                 ),
               ),
             ),
+
             const SizedBox(height: 16),
-            Text(l10n.getString('wallet_performance'),
-                style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+
+            Text(
+              l10n.getString('wallet_performance'),
+              style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+            ),
             const SizedBox(height: 8),
-            ..._walletStats.map((wallet) => Card(
-              margin: const EdgeInsets.only(bottom: 8),
-              child: ListTile(
-                leading: CircleAvatar(
-                  backgroundColor: Colors.blue.withOpacity(0.1),
-                  child: const Icon(Icons.account_balance_wallet, color: Colors.blue),
+
+            if (_walletStats.isEmpty)
+              const Card(
+                child: Padding(
+                  padding: EdgeInsets.all(32),
+                  child: Center(child: Text('لا توجد بيانات')),
                 ),
-                title: Text(wallet['name'] ?? ''),
-                subtitle: Text('${wallet['count'] ?? 0} ${l10n.getString('operations')}'),
-                trailing: Text(
-                  numberFormat.format((wallet['total'] as num?)?.toDouble() ?? 0),
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                ),
-              ),
-            )),
-            const SizedBox(height: 16),
-            Text('${isArabic ? "الأيام" : "Days"} (${_records.length})',
-                style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
-            const SizedBox(height: 8),
-            ..._records.map((record) {
-              final date = DateTime.parse(record['business_date'] as String);
-              final dateStr = DateFormat('EEEE d MMMM', isArabic ? 'ar' : 'en').format(date);
-              return Card(
+              )
+            else
+              ..._walletStats.map((wallet) => Card(
                 margin: const EdgeInsets.only(bottom: 8),
                 child: ListTile(
-                  title: Text(dateStr),
-                  subtitle: Text('${record['transaction_count'] ?? 0} ${l10n.getString('operations')}'),
-                  trailing: Text(
-                    numberFormat.format((record['total_amount'] as num?)?.toDouble() ?? 0),
-                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  leading: CircleAvatar(
+                    backgroundColor: Colors.blue.withOpacity(0.1),
+                    child: const Icon(Icons.account_balance_wallet, color: Colors.blue),
                   ),
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => DayDetailsScreen(date: record['business_date'] as String),
-                      ),
-                    );
-                  },
+                  title: Text(wallet['name'] ?? ''),
+                  subtitle: Text('${wallet['count'] ?? 0} ${l10n.getString('operations')}'),
+                  trailing: Text(
+                    numberFormat.format((wallet['total'] as num?)?.toDouble() ?? 0),
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                  ),
                 ),
-              );
-            }),
+              )),
+
+            const SizedBox(height: 16),
+
+            Text(
+              '${isArabic ? "الأيام" : "Days"} (${_records.length})',
+              style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+
+            if (_records.isEmpty)
+              const Card(
+                child: Padding(
+                  padding: EdgeInsets.all(32),
+                  child: Center(child: Text('لا توجد أيام')),
+                ),
+              )
+            else
+              ..._records.map((record) {
+                final date = DateTime.parse(record['business_date'] as String);
+                final dateStr = DateFormat('EEEE d MMMM', isArabic ? 'ar' : 'en').format(date);
+
+                return Card(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  child: ListTile(
+                    title: Text(dateStr),
+                    subtitle: Text('${record['transaction_count'] ?? 0} ${l10n.getString('operations')}'),
+                    trailing: Text(
+                      numberFormat.format((record['total_amount'] as num?)?.toDouble() ?? 0),
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => DayDetailsScreen(
+                            date: record['business_date'] as String,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                );
+              }),
           ],
         ),
       ),
@@ -172,13 +210,21 @@ class _MonthDetailsScreenState extends State<MonthDetailsScreen> {
     try {
       final pdfService = PdfService();
       final filePath = await pdfService.generateMonthlyReport(
-        year: widget.year, month: widget.month,
-        isArabic: isArabic, l10n: l10n, dbHelper: _dbHelper,
+        year: widget.year,
+        month: widget.month,
+        isArabic: isArabic,
+        l10n: l10n,
+        dbHelper: _dbHelper,
       );
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: const Text('تم إنشاء PDF'),
-            action: SnackBarAction(label: 'مشاركة', onPressed: () => pdfService.sharePdf(filePath)),
+          SnackBar(
+            content: const Text('تم إنشاء PDF'),
+            action: SnackBarAction(
+              label: 'مشاركة',
+              onPressed: () => pdfService.sharePdf(filePath),
+            ),
           ),
         );
       }

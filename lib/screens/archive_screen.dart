@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 import '../database/database_helper.dart';
-import '../l10n/app_localizations.dart';
 import 'month_details_screen.dart';
 
 class ArchiveScreen extends StatefulWidget {
@@ -33,22 +31,29 @@ class _ArchiveScreenState extends State<ArchiveScreen> {
       monthsByYear[year] = await _dbHelper.getAvailableMonths(year);
     }
 
-    setState(() {
-      _years = years;
-      _monthsByYear = monthsByYear;
-      _isLoading = false;
-    });
+    if (mounted) {
+      setState(() {
+        _years = years;
+        _monthsByYear = monthsByYear;
+        _isLoading = false;
+      });
+    }
   }
 
   String _getMonthName(int month, bool isArabic) {
-    const arabicMonths = ['', 'يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'];
-    const englishMonths = ['', 'January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+    const arabicMonths = [
+      '', 'يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو',
+      'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'
+    ];
+    const englishMonths = [
+      '', 'January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December'
+    ];
     return isArabic ? arabicMonths[month] : englishMonths[month];
   }
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
     final isArabic = Localizations.localeOf(context).languageCode == 'ar';
     final theme = Theme.of(context);
 
@@ -63,7 +68,8 @@ class _ArchiveScreenState extends State<ArchiveScreen> {
           children: [
             Icon(Icons.archive, size: 64, color: Colors.grey[400]),
             const SizedBox(height: 16),
-            Text('الأرشيف فارغ', style: TextStyle(fontSize: 18, color: Colors.grey[600])),
+            Text('الأرشيف فارغ',
+                style: TextStyle(fontSize: 18, color: Colors.grey[600])),
           ],
         ),
       )
@@ -78,7 +84,8 @@ class _ArchiveScreenState extends State<ArchiveScreen> {
             margin: const EdgeInsets.only(bottom: 12),
             child: ExpansionTile(
               leading: Icon(Icons.calendar_today, color: theme.colorScheme.primary),
-              title: Text('$year', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+              title: Text('$year',
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
               children: months.map((month) {
                 return ListTile(
                   leading: const Icon(Icons.folder, color: Colors.amber),
@@ -88,7 +95,10 @@ class _ArchiveScreenState extends State<ArchiveScreen> {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (context) => MonthDetailsScreen(year: year, month: month),
+                        builder: (context) => MonthDetailsScreen(
+                          year: year,
+                          month: month,
+                        ),
                       ),
                     );
                   },

@@ -100,10 +100,7 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> {
         content: Text('هل تريد حذف/تعطيل "$name"؟\nإذا كان النوع مستخدماً في عمليات سابقة، سيتم تعطيله فقط.'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('إلغاء')),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('تأكيد', style: TextStyle(color: Colors.red)),
-          ),
+          TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('تأكيد', style: TextStyle(color: Colors.red))),
         ],
       ),
     );
@@ -111,18 +108,6 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> {
     if (confirm == true) {
       await _dbHelper.deleteCategory(id);
       _loadCategories();
-    }
-  }
-
-  IconData _getIconData(String iconName) {
-    switch (iconName) {
-      case 'fastfood': return Icons.fastfood;
-      case 'cake': return Icons.cake;
-      case 'local_grocery_store': return Icons.local_grocery_store;
-      case 'local_drink': return Icons.local_drink;
-      case 'shopping_bag': return Icons.shopping_bag;
-      case 'build': return Icons.build;
-      default: return Icons.category;
     }
   }
 
@@ -149,7 +134,6 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> {
         itemBuilder: (context, index) {
           final cat = _categories[index];
           final isActive = cat['is_active'] == 1;
-          final icon = _getIconData(cat['icon_name'] as String? ?? 'category');
           final color = _getColor(index);
 
           return Card(
@@ -157,14 +141,18 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> {
             child: ListTile(
               leading: CircleAvatar(
                 backgroundColor: (isActive ? color : Colors.grey).withOpacity(0.1),
-                child: Icon(icon, color: isActive ? color : Colors.grey),
+                child: Icon(Icons.category, color: isActive ? color : Colors.grey),
               ),
               title: Text(cat['name'] as String),
               subtitle: Text(isActive ? 'نشط' : 'معطل'),
               trailing: PopupMenuButton(
                 itemBuilder: (context) => [
                   PopupMenuItem(
-                    child: ListTile(leading: const Icon(Icons.edit), title: const Text('تعديل'), contentPadding: EdgeInsets.zero),
+                    child: const ListTile(
+                      leading: Icon(Icons.edit),
+                      title: Text('تعديل'),
+                      contentPadding: EdgeInsets.zero,
+                    ),
                     onTap: () {
                       Navigator.pop(context);
                       _editCategory(cat['id'] as int, cat['name'] as String);
@@ -182,9 +170,9 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> {
                     },
                   ),
                   PopupMenuItem(
-                    child: ListTile(
-                      leading: const Icon(Icons.delete, color: Colors.red),
-                      title: const Text('حذف', style: TextStyle(color: Colors.red)),
+                    child: const ListTile(
+                      leading: Icon(Icons.delete, color: Colors.red),
+                      title: Text('حذف', style: TextStyle(color: Colors.red)),
                       contentPadding: EdgeInsets.zero,
                     ),
                     onTap: () {
