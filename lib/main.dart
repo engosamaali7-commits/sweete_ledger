@@ -45,7 +45,7 @@ class _MyAppState extends State<MyApp> {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'دفتر المحافظ',
+      title: 'مدير المحافظ',
       debugShowCheckedModeBanner: false,
 
       locale: Locale(_currentLocale),

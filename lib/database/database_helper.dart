@@ -26,6 +26,27 @@ class DatabaseHelper {
   }
 
   Future<void> _onCreate(Database db, int version) async {
+    // إنشاء جدول أنواع العمليات أولاً
+    try {
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS transaction_categories (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          name TEXT NOT NULL,
+          icon_name TEXT DEFAULT 'category',
+          is_active INTEGER DEFAULT 1,
+          sort_order INTEGER DEFAULT 0,
+          created_at TEXT DEFAULT CURRENT_TIMESTAMP
+        )
+      ''');
+
+      // إضافة أنواع افتراضية
+      await db.insert('transaction_categories', {'name': 'سمبوسة', 'icon_name': 'fastfood', 'sort_order': 1});
+      await db.insert('transaction_categories', {'name': 'حلويات', 'icon_name': 'cake', 'sort_order': 2});
+    } catch (e) {
+      // تجاهل إذا كان الجدول موجوداً
+    }
+
+    // جدول المحافظ
     await db.execute('''
       CREATE TABLE wallets (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -35,6 +56,7 @@ class DatabaseHelper {
       )
     ''');
 
+    // جدول السجلات اليومية
     await db.execute('''
       CREATE TABLE daily_records (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -46,6 +68,7 @@ class DatabaseHelper {
       )
     ''');
 
+    // جدول العمليات
     await db.execute('''
       CREATE TABLE transactions (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -61,6 +84,7 @@ class DatabaseHelper {
       )
     ''');
 
+    // إضافة محافظ افتراضية
     await db.insert('wallets', {'name': 'محفظة ١'});
     await db.insert('wallets', {'name': 'محفظة ٢'});
     await db.insert('wallets', {'name': 'محفظة ٣'});
@@ -77,6 +101,122 @@ class DatabaseHelper {
         await db.execute('ALTER TABLE daily_records ADD COLUMN is_archived INTEGER DEFAULT 0');
       } catch (e) {}
     }
+    // محاولة إنشاء جدول الفئات إذا لم يكن موجوداً
+    try {
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS transaction_categories (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          name TEXT NOT NULL,
+          icon_name TEXT DEFAULT 'category',
+          is_active INTEGER DEFAULT 1,
+          sort_order INTEGER DEFAULT 0,
+          created_at TEXT DEFAULT CURRENT_TIMESTAMP
+        )
+      ''');
+      // إضافة أنواع افتراضية إذا كانت فارغة
+      final count = Sqflite.firstIntValue(
+          await db.rawQuery('SELECT COUNT(*) FROM transaction_categories')) ?? 0;
+      if (count == 0) {
+        await db.insert('transaction_categories', {'name': 'سمبوسة', 'icon_name': 'fastfood', 'sort_order': 1});
+        await db.insert('transaction_categories', {'name': 'حلويات', 'icon_name': 'cake', 'sort_order': 2});
+      }
+    } catch (e) {}
+  }
+
+  // ============ TRANSACTION CATEGORIES ============
+
+  /// تحميل الفئات النشطة
+  Future<List<Map<String, dynamic>>> getActiveCategories() async {
+    try {
+      final db = await database;
+      return await db.query(
+        'transaction_categories',
+        where: 'is_active = ?',
+        whereArgs: [1],
+        orderBy: 'sort_order ASC',
+      );
+    } catch (e) {
+      // إذا كان الجدول غير موجود، أرجع قائمة افتراضية
+      return [
+        {'id': 1, 'name': 'سمبوسة', 'icon_name': 'fastfood', 'is_active': 1, 'sort_order': 1},
+        {'id': 2, 'name': 'حلويات', 'icon_name': 'cake', 'is_active': 1, 'sort_order': 2},
+      ];
+    }
+  }
+
+  /// تحميل جميع الفئات (بما فيها المعطلة)
+  Future<List<Map<String, dynamic>>> getAllCategories() async {
+    try {
+      final db = await database;
+      return await db.query('transaction_categories', orderBy: 'sort_order ASC');
+    } catch (e) {
+      return [
+        {'id': 1, 'name': 'سمبوسة', 'icon_name': 'fastfood', 'is_active': 1, 'sort_order': 1},
+        {'id': 2, 'name': 'حلويات', 'icon_name': 'cake', 'is_active': 1, 'sort_order': 2},
+      ];
+    }
+  }
+
+  /// إضافة فئة جديدة
+  Future<int> addCategory(String name, {String iconName = 'category'}) async {
+    final db = await database;
+    // إنشاء الجدول إذا لم يكن موجوداً
+    try {
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS transaction_categories (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          name TEXT NOT NULL,
+          icon_name TEXT DEFAULT 'category',
+          is_active INTEGER DEFAULT 1,
+          sort_order INTEGER DEFAULT 0,
+          created_at TEXT DEFAULT CURRENT_TIMESTAMP
+        )
+      ''');
+    } catch (e) {}
+
+    final maxOrder = Sqflite.firstIntValue(
+        await db.rawQuery('SELECT MAX(sort_order) FROM transaction_categories')) ?? 0;
+    return await db.insert('transaction_categories', {
+      'name': name,
+      'icon_name': iconName,
+      'sort_order': maxOrder + 1,
+    });
+  }
+
+  /// تعديل فئة
+  Future<int> updateCategory(int id, String name, {String? iconName}) async {
+    final db = await database;
+    final updates = <String, dynamic>{'name': name};
+    if (iconName != null) updates['icon_name'] = iconName;
+    return await db.update(
+      'transaction_categories',
+      updates,
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
+  /// تعطيل/تفعيل فئة
+  Future<int> toggleCategoryStatus(int id, bool isActive) async {
+    final db = await database;
+    return await db.update(
+      'transaction_categories',
+      {'is_active': isActive ? 1 : 0},
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
+  /// حذف/تعطيل فئة
+  Future<void> deleteCategory(int id) async {
+    final db = await database;
+    // تعطيل بدل الحذف للحفاظ على العمليات القديمة
+    await db.update(
+      'transaction_categories',
+      {'is_active': 0},
+      where: 'id = ?',
+      whereArgs: [id],
+    );
   }
 
   // ============ DAILY RECORDS ============
@@ -140,10 +280,7 @@ class DatabaseHelper {
       SELECT 
         d.*,
         COUNT(t.id) as transaction_count,
-        COALESCE(SUM(t.amount), 0) as total_amount,
-        COALESCE(SUM(CASE WHEN t.category = 'sambousa' THEN t.amount ELSE 0 END), 0) as sambousa_total,
-        COALESCE(SUM(CASE WHEN t.category = 'sweets' THEN t.amount ELSE 0 END), 0) as sweets_total,
-        COALESCE(SUM(CASE WHEN t.category = 'custom' THEN t.amount ELSE 0 END), 0) as custom_total
+        COALESCE(SUM(t.amount), 0) as total_amount
       FROM daily_records d
       LEFT JOIN transactions t ON d.id = t.daily_record_id
       GROUP BY d.id
@@ -236,12 +373,21 @@ class DatabaseHelper {
 
   Future<int> toggleWalletStatus(int id, bool isActive) async {
     final db = await database;
-    return await db.update('wallets', {'is_active': isActive ? 1 : 0}, where: 'id = ?', whereArgs: [id]);
+    return await db.update(
+      'wallets',
+      {'is_active': isActive ? 1 : 0},
+      where: 'id = ?',
+      whereArgs: [id],
+    );
   }
 
   Future<int> deleteWallet(int id) async {
     final db = await database;
-    final transactions = await db.query('transactions', where: 'wallet_id = ?', whereArgs: [id]);
+    final transactions = await db.query(
+      'transactions',
+      where: 'wallet_id = ?',
+      whereArgs: [id],
+    );
     if (transactions.isNotEmpty) {
       throw Exception('لا يمكن حذف محفظة لها عمليات مسجلة');
     }
@@ -279,13 +425,18 @@ class DatabaseHelper {
     String? note,
   }) async {
     final db = await database;
-    return await db.update('transactions', {
-      'wallet_id': walletId,
-      'category': category,
-      'custom_name': customName,
-      'amount': amount,
-      'note': note,
-    }, where: 'id = ?', whereArgs: [id]);
+    return await db.update(
+      'transactions',
+      {
+        'wallet_id': walletId,
+        'category': category,
+        'custom_name': customName,
+        'amount': amount,
+        'note': note,
+      },
+      where: 'id = ?',
+      whereArgs: [id],
+    );
   }
 
   Future<List<Map<String, dynamic>>> getTransactionsByDate(String date) async {
@@ -331,9 +482,6 @@ class DatabaseHelper {
     final result = await db.rawQuery('''
       SELECT 
         COALESCE(SUM(t.amount), 0) as total,
-        COALESCE(SUM(CASE WHEN t.category = 'sambousa' THEN t.amount ELSE 0 END), 0) as sambousa,
-        COALESCE(SUM(CASE WHEN t.category = 'sweets' THEN t.amount ELSE 0 END), 0) as sweets,
-        COALESCE(SUM(CASE WHEN t.category = 'custom' THEN t.amount ELSE 0 END), 0) as custom_total,
         COUNT(t.id) as count
       FROM daily_records d
       LEFT JOIN transactions t ON d.id = t.daily_record_id
@@ -344,28 +492,33 @@ class DatabaseHelper {
       SELECT t.custom_name, COALESCE(SUM(t.amount), 0) as total, COUNT(t.id) as count
       FROM transactions t
       INNER JOIN daily_records d ON t.daily_record_id = d.id
-      WHERE d.business_date = ? AND t.category = 'custom' AND t.custom_name IS NOT NULL
+      WHERE d.business_date = ? AND t.custom_name IS NOT NULL
       GROUP BY t.custom_name
+      ORDER BY total DESC
+    ''', [date]);
+
+    final categoryStats = await db.rawQuery('''
+      SELECT t.category as category_name, COALESCE(SUM(t.amount), 0) as total, COUNT(t.id) as count
+      FROM transactions t
+      INNER JOIN daily_records d ON t.daily_record_id = d.id
+      WHERE d.business_date = ?
+      GROUP BY t.category
       ORDER BY total DESC
     ''', [date]);
 
     if (result.isNotEmpty) {
       final data = <String, dynamic>{};
       data['total'] = result.first['total'] ?? 0;
-      data['sambousa'] = result.first['sambousa'] ?? 0;
-      data['sweets'] = result.first['sweets'] ?? 0;
-      data['custom_total'] = result.first['custom_total'] ?? 0;
       data['count'] = result.first['count'] ?? 0;
       data['custom_stats'] = customStats;
+      data['category_stats'] = categoryStats;
       return data;
     }
     return {
       'total': 0,
-      'sambousa': 0,
-      'sweets': 0,
-      'custom_total': 0,
       'count': 0,
       'custom_stats': <Map<String, dynamic>>[],
+      'category_stats': <Map<String, dynamic>>[],
     };
   }
 
@@ -379,9 +532,6 @@ class DatabaseHelper {
     final result = await db.rawQuery('''
       SELECT 
         COALESCE(SUM(t.amount), 0) as total,
-        COALESCE(SUM(CASE WHEN t.category = 'sambousa' THEN t.amount ELSE 0 END), 0) as sambousa,
-        COALESCE(SUM(CASE WHEN t.category = 'sweets' THEN t.amount ELSE 0 END), 0) as sweets,
-        COALESCE(SUM(CASE WHEN t.category = 'custom' THEN t.amount ELSE 0 END), 0) as custom_total,
         COUNT(t.id) as count,
         COUNT(DISTINCT d.id) as days_count
       FROM daily_records d
@@ -389,7 +539,9 @@ class DatabaseHelper {
       WHERE d.business_date >= ? AND d.business_date < ?
     ''', [startDate, endDate]);
 
-    return result.isNotEmpty ? result.first : {'total': 0, 'sambousa': 0, 'sweets': 0, 'custom_total': 0, 'count': 0, 'days_count': 0};
+    return result.isNotEmpty
+        ? result.first
+        : {'total': 0, 'count': 0, 'days_count': 0};
   }
 
   Future<List<Map<String, dynamic>>> getWalletStatistics(String date) async {
@@ -399,10 +551,7 @@ class DatabaseHelper {
       SELECT 
         w.id, w.name,
         COALESCE(SUM(t.amount), 0) as total,
-        COUNT(t.id) as count,
-        COALESCE(SUM(CASE WHEN t.category = 'sambousa' THEN t.amount ELSE 0 END), 0) as sambousa,
-        COALESCE(SUM(CASE WHEN t.category = 'sweets' THEN t.amount ELSE 0 END), 0) as sweets,
-        COALESCE(SUM(CASE WHEN t.category = 'custom' THEN t.amount ELSE 0 END), 0) as custom_total
+        COUNT(t.id) as count
       FROM wallets w
       INNER JOIN daily_records d ON d.business_date = ?
       LEFT JOIN transactions t ON t.wallet_id = w.id AND t.daily_record_id = d.id
@@ -411,7 +560,8 @@ class DatabaseHelper {
     ''', [date]);
   }
 
-  Future<List<Map<String, dynamic>>> getWalletStatisticsByMonth(int year, int month) async {
+  Future<List<Map<String, dynamic>>> getWalletStatisticsByMonth(
+      int year, int month) async {
     final db = await database;
     final startDate = '$year-${month.toString().padLeft(2, '0')}-01';
     final endDate = month < 12
@@ -422,10 +572,7 @@ class DatabaseHelper {
       SELECT 
         w.id, w.name,
         COALESCE(SUM(t.amount), 0) as total,
-        COUNT(t.id) as count,
-        COALESCE(SUM(CASE WHEN t.category = 'sambousa' THEN t.amount ELSE 0 END), 0) as sambousa,
-        COALESCE(SUM(CASE WHEN t.category = 'sweets' THEN t.amount ELSE 0 END), 0) as sweets,
-        COALESCE(SUM(CASE WHEN t.category = 'custom' THEN t.amount ELSE 0 END), 0) as custom_total
+        COUNT(t.id) as count
       FROM wallets w
       LEFT JOIN daily_records d ON d.business_date >= ? AND d.business_date < ?
       LEFT JOIN transactions t ON t.wallet_id = w.id AND t.daily_record_id = d.id

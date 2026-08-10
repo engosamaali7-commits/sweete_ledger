@@ -8,6 +8,8 @@ import '../database/database_helper.dart';
 import '../l10n/app_localizations.dart';
 import 'about_screen.dart';
 import 'wallets_screen.dart';
+import 'reports_screen.dart';
+import 'category_management_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   final Function(String)? onLanguageChanged;
@@ -31,18 +33,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   Future<void> _loadSettings() async {
     final prefs = await SharedPreferences.getInstance();
-    setState(() {
-      _currentLanguage = prefs.getString('language') ?? 'ar';
-      _retentionPolicy = prefs.getString('retentionPolicy') ?? 'always';
-    });
+    if (mounted) {
+      setState(() {
+        _currentLanguage = prefs.getString('language') ?? 'ar';
+        _retentionPolicy = prefs.getString('retentionPolicy') ?? 'always';
+      });
+    }
   }
 
   Future<void> _changeLanguage(String languageCode) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('language', languageCode);
-    setState(() {
-      _currentLanguage = languageCode;
-    });
+    if (mounted) setState(() => _currentLanguage = languageCode);
     widget.onLanguageChanged?.call(languageCode);
   }
 
@@ -50,7 +52,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
     try {
       final dbPath = await _dbHelper.getDatabasePath();
       final file = File(dbPath);
-
       if (await file.exists()) {
         await Share.shareXFiles(
           [XFile(dbPath)],
@@ -59,32 +60,25 @@ class _SettingsScreenState extends State<SettingsScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('خطأ: $e')),
-        );
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('خطأ: $e')));
       }
     }
   }
 
+  // ✅ دالة فتح الروابط - تعمل مباشرة بدون canLaunchUrl
   Future<void> _openUrl(String url) async {
     final uri = Uri.parse(url);
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-    }
+    await launchUrl(uri, mode: LaunchMode.externalApplication);
   }
 
   Future<void> _callPhone(String phone) async {
     final uri = Uri.parse('tel:$phone');
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri);
-    }
+    await launchUrl(uri);
   }
 
   Future<void> _openWhatsApp(String phone) async {
     final uri = Uri.parse('https://wa.me/$phone');
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-    }
+    await launchUrl(uri, mode: LaunchMode.externalApplication);
   }
 
   void _showRetentionPolicyDialog() {
@@ -102,7 +96,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               onChanged: (value) async {
                 final prefs = await SharedPreferences.getInstance();
                 await prefs.setString('retentionPolicy', value!);
-                setState(() => _retentionPolicy = value);
+                if (mounted) setState(() => _retentionPolicy = value);
                 Navigator.pop(context);
               },
             ),
@@ -113,7 +107,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               onChanged: (value) async {
                 final prefs = await SharedPreferences.getInstance();
                 await prefs.setString('retentionPolicy', value!);
-                setState(() => _retentionPolicy = value);
+                if (mounted) setState(() => _retentionPolicy = value);
                 Navigator.pop(context);
               },
             ),
@@ -124,7 +118,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               onChanged: (value) async {
                 final prefs = await SharedPreferences.getInstance();
                 await prefs.setString('retentionPolicy', value!);
-                setState(() => _retentionPolicy = value);
+                if (mounted) setState(() => _retentionPolicy = value);
                 Navigator.pop(context);
               },
             ),
@@ -135,7 +129,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               onChanged: (value) async {
                 final prefs = await SharedPreferences.getInstance();
                 await prefs.setString('retentionPolicy', value!);
-                setState(() => _retentionPolicy = value);
+                if (mounted) setState(() => _retentionPolicy = value);
                 Navigator.pop(context);
               },
             ),
@@ -146,7 +140,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               onChanged: (value) async {
                 final prefs = await SharedPreferences.getInstance();
                 await prefs.setString('retentionPolicy', value!);
-                setState(() => _retentionPolicy = value);
+                if (mounted) setState(() => _retentionPolicy = value);
                 Navigator.pop(context);
               },
             ),
@@ -162,9 +156,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final isArabic = _currentLanguage == 'ar';
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(l10n.getString('settings')),
-      ),
+      appBar: AppBar(title: Text(l10n.getString('settings'))),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
@@ -183,9 +175,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       ButtonSegment(value: 'en', label: Text('EN')),
                     ],
                     selected: {_currentLanguage},
-                    onSelectionChanged: (value) {
-                      _changeLanguage(value.first);
-                    },
+                    onSelectionChanged: (value) => _changeLanguage(value.first),
                   ),
                 ),
                 const Divider(height: 1),
@@ -201,10 +191,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   title: Text(l10n.getString('app_info')),
                   trailing: const Icon(Icons.chevron_left),
                   onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (context) => const AboutScreen()),
-                    );
+                    Navigator.push(context, MaterialPageRoute(builder: (_) => const AboutScreen()));
                   },
                 ),
               ],
@@ -264,9 +251,40 @@ class _SettingsScreenState extends State<SettingsScreen> {
               title: Text(l10n.getString('manage_wallets')),
               trailing: const Icon(Icons.chevron_left),
               onTap: () {
+                Navigator.push(context, MaterialPageRoute(builder: (_) => const WalletsScreen()));
+              },
+            ),
+          ),
+
+          const SizedBox(height: 16),
+
+          // ============ أنواع العمليات ============
+          _buildSectionHeader('أنواع العمليات'),
+          Card(
+            child: ListTile(
+              leading: const Icon(Icons.category),
+              title: const Text('إدارة أنواع العمليات'),
+              trailing: const Icon(Icons.chevron_left),
+              onTap: () {
+                Navigator.push(context, MaterialPageRoute(builder: (_) => const CategoryManagementScreen()));
+              },
+            ),
+          ),
+
+          const SizedBox(height: 16),
+
+          // ============ التقارير ✅ رابط صحيح ============
+          _buildSectionHeader(l10n.getString('reports_section')),
+          Card(
+            child: ListTile(
+              leading: const Icon(Icons.description),
+              title: Text(l10n.getString('reports_settings')),
+              trailing: const Icon(Icons.chevron_left),
+              onTap: () {
+                // ✅ فتح صفحة التقارير مباشرة
                 Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (context) => const WalletsScreen()),
+                  MaterialPageRoute(builder: (context) => const ReportsScreen()),
                 );
               },
             ),
@@ -274,20 +292,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
           const SizedBox(height: 16),
 
-          // ============ التقارير ============
-          _buildSectionHeader(l10n.getString('reports_section')),
-          Card(
-            child: ListTile(
-              leading: const Icon(Icons.description),
-              title: Text(l10n.getString('reports_settings')),
-              trailing: const Icon(Icons.chevron_left),
-              onTap: () {},
-            ),
-          ),
-
-          const SizedBox(height: 16),
-
-          // ============ التواصل ============
+          // ============ التواصل ✅ روابط صحيحة ============
           _buildSectionHeader(l10n.getString('contact_section')),
           Card(
             child: Column(
@@ -316,7 +321,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ListTile(
                   leading: const Icon(Icons.code, color: Colors.black),
                   title: Text(l10n.getString('github')),
-                  onTap: () => _openUrl('https://github.com/engosamaali7-commits'),
+                  subtitle: const Text('OQ-Developer'),
+                  onTap: () => _openUrl('https://github.com/engosamaali7-commits/OQ-Developer'),
                 ),
               ],
             ),
@@ -332,10 +338,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               title: Text(l10n.getString('about')),
               trailing: const Icon(Icons.chevron_left),
               onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => const AboutScreen()),
-                );
+                Navigator.push(context, MaterialPageRoute(builder: (_) => const AboutScreen()));
               },
             ),
           ),

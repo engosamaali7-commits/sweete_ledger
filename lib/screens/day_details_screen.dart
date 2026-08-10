@@ -18,7 +18,7 @@ class _DayDetailsScreenState extends State<DayDetailsScreen> {
   final DatabaseHelper _dbHelper = DatabaseHelper();
   Map<String, dynamic> _stats = {};
   List<Map<String, dynamic>> _transactions = [];
-  List<Map<String, dynamic>> _customStats = [];
+  List<Map<String, dynamic>> _categoryStats = [];
   bool _isLoading = true;
 
   @override
@@ -33,15 +33,17 @@ class _DayDetailsScreenState extends State<DayDetailsScreen> {
     final stats = await _dbHelper.getDailyStatistics(widget.date);
     final transactions = await _dbHelper.getTransactionsByDate(widget.date);
 
-    setState(() {
-      _stats = stats;
-      _transactions = transactions;
-      _customStats = (stats['custom_stats'] as List<dynamic>?)
-          ?.map((e) => e as Map<String, dynamic>)
-          .toList() ??
-          [];
-      _isLoading = false;
-    });
+    if (mounted) {
+      setState(() {
+        _stats = stats;
+        _transactions = transactions;
+        _categoryStats = (stats['category_stats'] as List<dynamic>?)
+            ?.map((e) => e as Map<String, dynamic>)
+            .toList() ??
+            [];
+        _isLoading = false;
+      });
+    }
   }
 
   @override
@@ -52,6 +54,7 @@ class _DayDetailsScreenState extends State<DayDetailsScreen> {
     final date = DateTime.parse(widget.date);
     final dateStr = DateFormat('EEEE d MMMM yyyy', isArabic ? 'ar' : 'en').format(date);
     final numberFormat = NumberFormat('#,###', isArabic ? 'ar' : 'en');
+    final colors = [Colors.orange, Colors.pink, Colors.teal, Colors.blue, Colors.purple, Colors.green];
 
     return Scaffold(
       appBar: AppBar(
@@ -99,25 +102,31 @@ class _DayDetailsScreenState extends State<DayDetailsScreen> {
                         ),
                       ),
                       const SizedBox(height: 12),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceAround,
-                        children: [
-                          _buildMiniStat(l10n.getString('sambousa'),
-                              numberFormat.format(_stats['sambousa'] ?? 0), Colors.orange),
-                          _buildMiniStat(l10n.getString('sweets'),
-                              numberFormat.format(_stats['sweets'] ?? 0), Colors.pink),
-                          _buildMiniStat(l10n.getString('other'),
-                              numberFormat.format(_stats['custom_total'] ?? 0), Colors.teal),
-                          _buildMiniStat(l10n.getString('operations_count'),
-                              '${_stats['count'] ?? 0}', Colors.blue),
-                        ],
+                      Wrap(
+                        spacing: 16,
+                        runSpacing: 8,
+                        children: _categoryStats.asMap().entries.map((entry) {
+                          final color = colors[entry.key % colors.length];
+                          final stat = entry.value;
+                          return _buildMiniStat(
+                            stat['category_name'] ?? '',
+                            numberFormat.format((stat['total'] as num?)?.toDouble() ?? 0),
+                            color,
+                          );
+                        }).toList(),
+                      ),
+                      const SizedBox(height: 8),
+                      _buildMiniStat(
+                        l10n.getString('operations_count'),
+                        '${_stats['count'] ?? 0}',
+                        Colors.blue,
                       ),
                     ],
                   ),
                 ),
               ),
 
-              if (_customStats.isNotEmpty) ...[
+              if (_categoryStats.isNotEmpty) ...[
                 const SizedBox(height: 16),
                 Card(
                   child: Padding(
@@ -125,20 +134,30 @@ class _DayDetailsScreenState extends State<DayDetailsScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(l10n.getString('other'),
+                        Text('تفاصيل الأنواع',
                             style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
                         const SizedBox(height: 8),
-                        ..._customStats.map((stat) => Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 4),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text(stat['custom_name'] ?? ''),
-                              Text(numberFormat.format((stat['total'] as num?)?.toDouble() ?? 0),
-                                  style: const TextStyle(fontWeight: FontWeight.bold)),
-                            ],
-                          ),
-                        )),
+                        ..._categoryStats.asMap().entries.map((entry) {
+                          final color = colors[entry.key % colors.length];
+                          final stat = entry.value;
+                          return Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 4),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Row(children: [
+                                  Icon(Icons.circle, size: 8, color: color),
+                                  const SizedBox(width: 8),
+                                  Text(stat['category_name'] ?? ''),
+                                ]),
+                                Text(
+                                  numberFormat.format((stat['total'] as num?)?.toDouble() ?? 0),
+                                  style: const TextStyle(fontWeight: FontWeight.bold),
+                                ),
+                              ],
+                            ),
+                          );
+                        }),
                       ],
                     ),
                   ),
@@ -147,8 +166,10 @@ class _DayDetailsScreenState extends State<DayDetailsScreen> {
 
               const SizedBox(height: 16),
 
-              Text('${l10n.getString('transactions')} (${_transactions.length})',
-                  style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+              Text(
+                '${l10n.getString('transactions')} (${_transactions.length})',
+                style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+              ),
               const SizedBox(height: 8),
 
               if (_transactions.isEmpty)
@@ -160,31 +181,13 @@ class _DayDetailsScreenState extends State<DayDetailsScreen> {
                 )
               else
                 ..._transactions.map((t) {
-                  final category = t['category'] as String? ?? 'sambousa';
-                  final isSambousa = category == 'sambousa';
-                  final isSweets = category == 'sweets';
+                  final categoryName = (t['category_name'] as String?) ?? (t['custom_name'] as String?) ?? '';
                   final time = t['created_at'] != null
                       ? DateFormat('hh:mm a', isArabic ? 'ar' : 'en')
                       .format(DateTime.parse(t['created_at'] as String))
                       : '';
-
-                  IconData icon;
-                  Color color;
-                  String title;
-
-                  if (isSambousa) {
-                    icon = Icons.fastfood;
-                    color = Colors.orange;
-                    title = l10n.getString('sambousa');
-                  } else if (isSweets) {
-                    icon = Icons.cake;
-                    color = Colors.pink;
-                    title = l10n.getString('sweets');
-                  } else {
-                    icon = Icons.more_horiz;
-                    color = Colors.teal;
-                    title = (t['custom_name'] as String?) ?? l10n.getString('other');
-                  }
+                  final colorIndex = _transactions.indexOf(t) % colors.length;
+                  final color = colors[colorIndex];
 
                   return Card(
                     margin: const EdgeInsets.only(bottom: 8),
@@ -195,11 +198,13 @@ class _DayDetailsScreenState extends State<DayDetailsScreen> {
                           color: color.withOpacity(0.1),
                           borderRadius: BorderRadius.circular(8),
                         ),
-                        child: Icon(icon, color: color, size: 20),
+                        child: Icon(Icons.receipt, color: color, size: 20),
                       ),
-                      title: Text(title, style: const TextStyle(fontSize: 14)),
-                      subtitle: Text('${t['wallet_name'] ?? ''} • $time',
-                          style: const TextStyle(fontSize: 12)),
+                      title: Text(categoryName, style: const TextStyle(fontSize: 14)),
+                      subtitle: Text(
+                        '${t['wallet_name'] ?? ''} • $time',
+                        style: const TextStyle(fontSize: 12),
+                      ),
                       trailing: Text(
                         numberFormat.format((t['amount'] as num?)?.toDouble() ?? 0),
                         style: TextStyle(fontWeight: FontWeight.bold, color: color),
@@ -282,13 +287,10 @@ class _DayDetailsScreenState extends State<DayDetailsScreen> {
     buffer.writeln('📅 $dateStr');
     buffer.writeln('━━━━━━━━━━━━');
     buffer.writeln('💰 ${isArabic ? "الإجمالي" : "Total"}: ${numberFormat.format(stats['total'] ?? 0)}');
-    buffer.writeln('🥟 ${l10n.getString('sambousa')}: ${numberFormat.format(stats['sambousa'] ?? 0)}');
-    buffer.writeln('🍰 ${l10n.getString('sweets')}: ${numberFormat.format(stats['sweets'] ?? 0)}');
-    buffer.writeln('📦 ${l10n.getString('other')}: ${numberFormat.format(stats['custom_total'] ?? 0)}');
     buffer.writeln('━━━━━━━━━━━━');
     buffer.writeln('${isArabic ? "المحافظ" : "Wallets"}:');
     for (var w in walletStats) {
-      buffer.writeln('${w['name']}: ${numberFormat.format(w['total'] ?? 0)}');
+      buffer.writeln('${w['name']}: ${numberFormat.format((w['total'] as num?)?.toDouble() ?? 0)}');
     }
     buffer.writeln('━━━━━━━━━━━━');
     buffer.writeln('${l10n.getString('operations_count')}: ${stats['count'] ?? 0}');
