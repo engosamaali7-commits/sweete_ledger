@@ -128,7 +128,7 @@
 
 ### لوحة التحكم
 
-![Dashboard](assets/screenshots/dashboard.png)
+![Dashboard](assets/screenshots/dashboard1.png)
 
 ### تسجيل عملية
 
