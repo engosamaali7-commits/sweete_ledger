@@ -55,7 +55,12 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> {
 
     if (name != null && name.isNotEmpty) {
       await _dbHelper.addCategory(name);
-      _loadCategories();
+      await _loadCategories(); // ✅ إعادة تحميل
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('✅ تم إضافة النوع بنجاح'), backgroundColor: Colors.green),
+        );
+      }
     }
   }
 
@@ -83,13 +88,26 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> {
 
     if (name != null && name.isNotEmpty) {
       await _dbHelper.updateCategory(id, name);
-      _loadCategories();
+      await _loadCategories(); // ✅ إعادة تحميل
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('✅ تم تعديل النوع بنجاح'), backgroundColor: Colors.green),
+        );
+      }
     }
   }
 
   Future<void> _toggleCategory(int id, bool isActive) async {
     await _dbHelper.toggleCategoryStatus(id, !isActive);
-    _loadCategories();
+    await _loadCategories(); // ✅ إعادة تحميل
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(!isActive ? '✅ تم تفعيل النوع' : '⚠️ تم تعطيل النوع'),
+          backgroundColor: !isActive ? Colors.green : Colors.orange,
+        ),
+      );
+    }
   }
 
   Future<void> _deleteCategory(int id, String name) async {
@@ -100,14 +118,22 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> {
         content: Text('هل تريد حذف/تعطيل "$name"؟\nإذا كان النوع مستخدماً في عمليات سابقة، سيتم تعطيله فقط.'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('إلغاء')),
-          TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('تأكيد', style: TextStyle(color: Colors.red))),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('تأكيد', style: TextStyle(color: Colors.red)),
+          ),
         ],
       ),
     );
 
     if (confirm == true) {
       await _dbHelper.deleteCategory(id);
-      _loadCategories();
+      await _loadCategories(); // ✅ إعادة تحميل
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('✅ تم حذف/تعطيل النوع'), backgroundColor: Colors.green),
+        );
+      }
     }
   }
 

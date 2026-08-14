@@ -25,8 +25,15 @@ class DatabaseHelper {
     );
   }
 
+  /// ✅ إغلاق قاعدة البيانات
+  Future<void> closeDatabase() async {
+    if (_database != null) {
+      await _database!.close();
+      _database = null;
+    }
+  }
+
   Future<void> _onCreate(Database db, int version) async {
-    // ✅ إنشاء جدول أنواع العمليات
     await db.execute('''
       CREATE TABLE transaction_categories (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -38,11 +45,9 @@ class DatabaseHelper {
       )
     ''');
 
-    // ✅ إضافة أنواع افتراضية (لكنها قابلة للتعديل والحذف)
     await db.insert('transaction_categories', {'name': 'سمبوسة', 'icon_name': 'fastfood', 'sort_order': 1});
     await db.insert('transaction_categories', {'name': 'حلويات', 'icon_name': 'cake', 'sort_order': 2});
 
-    // ✅ جدول المحافظ
     await db.execute('''
       CREATE TABLE wallets (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -52,7 +57,6 @@ class DatabaseHelper {
       )
     ''');
 
-    // ✅ جدول السجلات اليومية
     await db.execute('''
       CREATE TABLE daily_records (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -64,7 +68,6 @@ class DatabaseHelper {
       )
     ''');
 
-    // ✅ جدول العمليات
     await db.execute('''
       CREATE TABLE transactions (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -80,7 +83,6 @@ class DatabaseHelper {
       )
     ''');
 
-    // ✅ إضافة محافظ افتراضية
     await db.insert('wallets', {'name': 'محفظة ١'});
     await db.insert('wallets', {'name': 'محفظة ٢'});
     await db.insert('wallets', {'name': 'محفظة ٣'});
@@ -97,7 +99,6 @@ class DatabaseHelper {
         await db.execute('ALTER TABLE daily_records ADD COLUMN is_archived INTEGER DEFAULT 0');
       } catch (e) {}
     }
-    // ✅ محاولة إنشاء جدول الفئات إذا لم يكن موجوداً
     try {
       await db.execute('''
         CREATE TABLE IF NOT EXISTS transaction_categories (
@@ -120,7 +121,6 @@ class DatabaseHelper {
 
   // ============ TRANSACTION CATEGORIES ============
 
-  /// ✅ تحميل الفئات النشطة (تظهر في شاشة الإضافة)
   Future<List<Map<String, dynamic>>> getActiveCategories() async {
     try {
       final db = await database;
@@ -138,7 +138,6 @@ class DatabaseHelper {
     }
   }
 
-  /// ✅ تحميل جميع الفئات (بما فيها المعطلة)
   Future<List<Map<String, dynamic>>> getAllCategories() async {
     try {
       final db = await database;
@@ -151,7 +150,6 @@ class DatabaseHelper {
     }
   }
 
-  /// ✅ إضافة فئة جديدة
   Future<int> addCategory(String name, {String iconName = 'category'}) async {
     final db = await database;
     try {
@@ -176,7 +174,6 @@ class DatabaseHelper {
     });
   }
 
-  /// ✅ تعديل فئة (يشمل السمبوسة والحلويات)
   Future<int> updateCategory(int id, String name, {String? iconName}) async {
     final db = await database;
     final updates = <String, dynamic>{'name': name};
@@ -189,7 +186,6 @@ class DatabaseHelper {
     );
   }
 
-  /// ✅ تعطيل/تفعيل فئة
   Future<int> toggleCategoryStatus(int id, bool isActive) async {
     final db = await database;
     return await db.update(
@@ -200,7 +196,6 @@ class DatabaseHelper {
     );
   }
 
-  /// ✅ حذف فئة (تعطيل فقط إذا كانت مستخدمة)
   Future<void> deleteCategory(int id) async {
     final db = await database;
     await db.update(
@@ -468,7 +463,6 @@ class DatabaseHelper {
 
   // ============ STATISTICS ============
 
-  /// ✅ إحصائيات يومية دقيقة - تعتمد على category مباشرة
   Future<Map<String, dynamic>> getDailyStatistics(String date) async {
     final db = await database;
 
@@ -481,7 +475,6 @@ class DatabaseHelper {
       WHERE d.business_date = ?
     ''', [date]);
 
-    // ✅ إحصائيات حسب الفئة (category) مباشرة
     final categoryStats = await db.rawQuery('''
       SELECT t.category as category_name, COALESCE(SUM(t.amount), 0) as total, COUNT(t.id) as count
       FROM transactions t
@@ -527,7 +520,6 @@ class DatabaseHelper {
         : {'total': 0, 'count': 0, 'days_count': 0};
   }
 
-  /// ✅ إحصائيات المحافظ - بدون تفصيل حسب الفئة (فقط الإجمالي والعدد)
   Future<List<Map<String, dynamic>>> getWalletStatistics(String date) async {
     final db = await database;
 

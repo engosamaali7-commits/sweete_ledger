@@ -4,12 +4,14 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:intl/intl.dart';
 import 'dart:io';
+import 'dart:async';
 import '../database/database_helper.dart';
 import '../l10n/app_localizations.dart';
 import 'about_screen.dart';
 import 'wallets_screen.dart';
 import 'reports_screen.dart';
 import 'category_management_screen.dart';
+import 'home_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   final Function(String)? onLanguageChanged;
@@ -65,7 +67,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
-  // ✅ دالة فتح الروابط - تعمل مباشرة بدون canLaunchUrl
   Future<void> _openUrl(String url) async {
     final uri = Uri.parse(url);
     await launchUrl(uri, mode: LaunchMode.externalApplication);
@@ -148,6 +149,112 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ),
       ),
     );
+  }
+
+  /// ✅ مسح جميع البيانات - الإصلاح الكامل
+  Future<void> _clearAllData() async {
+    final firstConfirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(children: [
+          Icon(Icons.warning_amber_rounded, color: Colors.red[700], size: 28),
+          const SizedBox(width: 8),
+          const Text('تحذير!'),
+        ]),
+        content: const Text(
+          'سيتم حذف جميع البيانات نهائياً:\n\n'
+              '• جميع العمليات المسجلة\n'
+              '• جميع المحافظ\n'
+              '• جميع أنواع العمليات\n'
+              '• سجل الأيام السابقة\n\n'
+              'لا يمكن التراجع عن هذه العملية!\n'
+              'هل أنت متأكد أنك تريد المتابعة؟',
+          style: TextStyle(fontSize: 15),
+          textAlign: TextAlign.center,
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('إلغاء')),
+          FilledButton(onPressed: () => Navigator.pop(context, true), style: FilledButton.styleFrom(backgroundColor: Colors.red[700]), child: const Text('متابعة')),
+        ],
+      ),
+    );
+
+    if (firstConfirm != true) return;
+
+    final secondConfirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(children: [
+          Icon(Icons.dangerous, color: Colors.red[900], size: 28),
+          const SizedBox(width: 8),
+          const Text('تأكيد نهائي'),
+        ]),
+        content: const Text(
+          'هذه آخر فرصة للتراجع!\n\nهل أنت متأكد 100% أنك تريد مسح جميع البيانات؟',
+          style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+          textAlign: TextAlign.center,
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('تراجع')),
+          FilledButton(onPressed: () => Navigator.pop(context, true), style: FilledButton.styleFrom(backgroundColor: Colors.red[900]), child: const Text('نعم، امسح كل شيء')),
+        ],
+      ),
+    );
+
+    if (secondConfirm != true) return;
+
+    try {
+      // ✅ 1. إغلاق قاعدة البيانات
+      await _dbHelper.closeDatabase();
+
+      // ✅ 2. حذف ملف قاعدة البيانات
+      final dbPath = await _dbHelper.getDatabasePath();
+      final dbFile = File(dbPath);
+      if (await dbFile.exists()) {
+        await dbFile.delete();
+      }
+
+      // ✅ 3. حذف الملفات الإضافية
+      for (final suffix in ['-journal', '-wal', '-shm']) {
+        final extraFile = File('$dbPath$suffix');
+        if (await extraFile.exists()) {
+          await extraFile.delete();
+        }
+      }
+
+      // ✅ 4. مسح SharedPreferences
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.clear();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('✅ تم مسح جميع البيانات بنجاح'),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 3),
+          ),
+        );
+      }
+
+      // ✅ 5. إعادة تشغيل التطبيق بالكامل
+      await Future.delayed(const Duration(milliseconds: 500));
+      if (mounted) {
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(
+            builder: (context) => HomeScreen(onLanguageChanged: widget.onLanguageChanged),
+          ),
+              (route) => false,
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('حدث خطأ أثناء المسح: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
   }
 
   @override
@@ -237,6 +344,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   trailing: const Icon(Icons.chevron_left),
                   onTap: _showRetentionPolicyDialog,
                 ),
+                const Divider(height: 1),
+                ListTile(
+                  leading: Icon(Icons.delete_forever, color: Colors.red[700]),
+                  title: Text('مسح جميع البيانات', style: TextStyle(color: Colors.red[700], fontWeight: FontWeight.bold)),
+                  subtitle: const Text('حذف جميع العمليات والمحافظ نهائياً'),
+                  trailing: Icon(Icons.chevron_left, color: Colors.red[700]),
+                  onTap: _clearAllData,
+                ),
               ],
             ),
           ),
@@ -250,8 +365,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
               leading: const Icon(Icons.account_balance_wallet),
               title: Text(l10n.getString('manage_wallets')),
               trailing: const Icon(Icons.chevron_left),
-              onTap: () {
-                Navigator.push(context, MaterialPageRoute(builder: (_) => const WalletsScreen()));
+              onTap: () async {
+                await Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const WalletsScreen()),
+                );
+                if (mounted) setState(() {});
               },
             ),
           ),
@@ -265,15 +384,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
               leading: const Icon(Icons.category),
               title: const Text('إدارة أنواع العمليات'),
               trailing: const Icon(Icons.chevron_left),
-              onTap: () {
-                Navigator.push(context, MaterialPageRoute(builder: (_) => const CategoryManagementScreen()));
+              onTap: () async {
+                await Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const CategoryManagementScreen()),
+                );
+                if (mounted) setState(() {});
               },
             ),
           ),
 
           const SizedBox(height: 16),
 
-          // ============ التقارير ✅ رابط صحيح ============
+          // ============ التقارير ============
           _buildSectionHeader(l10n.getString('reports_section')),
           Card(
             child: ListTile(
@@ -281,18 +404,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
               title: Text(l10n.getString('reports_settings')),
               trailing: const Icon(Icons.chevron_left),
               onTap: () {
-                // ✅ فتح صفحة التقارير مباشرة
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => const ReportsScreen()),
-                );
+                Navigator.push(context, MaterialPageRoute(builder: (_) => const ReportsScreen()));
               },
             ),
           ),
 
           const SizedBox(height: 16),
 
-          // ============ التواصل ✅ روابط صحيحة ============
+          // ============ التواصل ============
           _buildSectionHeader(l10n.getString('contact_section')),
           Card(
             child: Column(
