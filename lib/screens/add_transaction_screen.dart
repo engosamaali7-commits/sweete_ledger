@@ -25,6 +25,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
   List<Map<String, dynamic>> _wallets = [];
   bool _isLoading = false;
   bool _isCustom = false;
+  bool _categoryError = false; // ✅ متغير لتتبع خطأ عدم اختيار النوع
 
   @override
   void initState() {
@@ -34,7 +35,6 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
 
   Future<void> _loadData() async {
     try {
-      // ✅ تحميل الفئات من قاعدة البيانات
       final categories = await _dbHelper.getActiveCategories();
       final wallets = await _dbHelper.getActiveWallets();
       if (mounted) {
@@ -44,7 +44,6 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
         });
       }
     } catch (e) {
-      // ✅ إذا فشل تحميل الفئات (الجدول غير موجود)، استخدم فئات افتراضية
       if (mounted) {
         setState(() {
           _categories = [
@@ -54,7 +53,6 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
           _wallets = [];
         });
       }
-      // تحميل المحافظ
       try {
         final wallets = await _dbHelper.getActiveWallets();
         if (mounted) setState(() => _wallets = wallets);
@@ -85,8 +83,84 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
     }
   }
 
+  /// ✅ دالة التحقق من صحة البيانات قبل الحفظ
+  bool _validateData() {
+    // التحقق من اختيار نوع العملية
+    if (!_isCustom && _selectedCategoryId == null) {
+      setState(() => _categoryError = true);
+      _showWarningDialog('يجب اختيار نوع العملية أولاً');
+      return false;
+    }
+
+    // التحقق من اسم العملية المخصصة
+    if (_isCustom && _customNameController.text.trim().isEmpty) {
+      _showWarningDialog('يجب إدخال اسم العملية المخصصة');
+      return false;
+    }
+
+    // التحقق من اختيار المحفظة
+    if (_selectedWalletId == null) {
+      _showWarningDialog('يجب اختيار المحفظة');
+      return false;
+    }
+
+    // التحقق من المبلغ
+    if (_amountController.text.isEmpty) {
+      _showWarningDialog('يجب إدخال المبلغ');
+      return false;
+    }
+
+    final amount = double.tryParse(_amountController.text);
+    if (amount == null || amount <= 0) {
+      _showWarningDialog('يجب أن يكون المبلغ أكبر من صفر');
+      return false;
+    }
+
+    return true;
+  }
+
+  /// ✅ عرض رسالة تحذير احترافية
+  void _showWarningDialog(String message) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        title: Row(
+          children: [
+            Icon(Icons.warning_amber_rounded, color: Colors.orange[700], size: 28),
+            const SizedBox(width: 8),
+            const Text('تنبيه'),
+          ],
+        ),
+        content: Text(
+          message,
+          style: const TextStyle(fontSize: 15),
+          textAlign: TextAlign.center,
+        ),
+        actions: [
+          Center(
+            child: FilledButton(
+              onPressed: () => Navigator.pop(context),
+              style: FilledButton.styleFrom(
+                backgroundColor: Colors.orange[700],
+                padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              child: const Text('حسناً'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _saveTransaction() async {
-    if (!_formKey.currentState!.validate()) return;
+    // ✅ التحقق من البيانات قبل أي عملية حفظ
+    if (!_validateData()) return;
 
     setState(() => _isLoading = true);
 
@@ -94,7 +168,6 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
       final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
       final recordId = await _dbHelper.createDailyRecordIfNotExists(today);
 
-      // ✅ تحديد اسم الفئة
       final String categoryName;
       if (_isCustom) {
         categoryName = _customNameController.text.trim();
@@ -148,8 +221,36 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               // ============ نوع العملية ============
-              Text(l10n.getString('category'), style: theme.textTheme.titleMedium),
+              Row(
+                children: [
+                  Text(l10n.getString('category'), style: theme.textTheme.titleMedium),
+                  const SizedBox(width: 4),
+                  Text('*', style: TextStyle(color: Colors.red, fontSize: 16)),
+                ],
+              ),
               const SizedBox(height: 12),
+
+              // ✅ إظهار رسالة خطأ إذا لم يتم اختيار نوع
+              if (_categoryError)
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.red.withOpacity(0.05),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.red.withOpacity(0.3)),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.error_outline, color: Colors.red[400], size: 18),
+                      const SizedBox(width: 6),
+                      const Text(
+                        'يجب اختيار نوع العملية',
+                        style: TextStyle(color: Colors.red, fontSize: 13),
+                      ),
+                    ],
+                  ),
+                ),
+              if (_categoryError) const SizedBox(height: 8),
 
               // ✅ عرض جميع الفئات من قاعدة البيانات
               Wrap(
@@ -170,6 +271,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                           _selectedCategoryId = cat['id'] as int;
                           _selectedCategoryName = cat['name'] as String;
                           _isCustom = false;
+                          _categoryError = false; // ✅ إزالة الخطأ عند الاختيار
                           _customNameController.clear();
                         });
                       },
@@ -210,6 +312,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                         _isCustom = true;
                         _selectedCategoryId = null;
                         _selectedCategoryName = null;
+                        _categoryError = false; // ✅ إزالة الخطأ
                       });
                     },
                     child: Card(
@@ -239,7 +342,13 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
               // ============ اسم العملية المخصصة ============
               if (_isCustom) ...[
                 const SizedBox(height: 24),
-                Text(l10n.getString('custom_name'), style: theme.textTheme.titleMedium),
+                Row(
+                  children: [
+                    Text(l10n.getString('custom_name'), style: theme.textTheme.titleMedium),
+                    const SizedBox(width: 4),
+                    Text('*', style: TextStyle(color: Colors.red, fontSize: 16)),
+                  ],
+                ),
                 const SizedBox(height: 12),
                 TextFormField(
                   controller: _customNameController,
@@ -248,19 +357,19 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                     prefixIcon: const Icon(Icons.edit_note),
                     hintText: l10n.getString('custom_name'),
                   ),
-                  validator: (value) {
-                    if (value == null || value.trim().isEmpty) {
-                      return l10n.getString('custom_name_required');
-                    }
-                    return null;
-                  },
                 ),
               ],
 
               const SizedBox(height: 24),
 
               // ============ المحفظة ============
-              Text(l10n.getString('wallet'), style: theme.textTheme.titleMedium),
+              Row(
+                children: [
+                  Text(l10n.getString('wallet'), style: theme.textTheme.titleMedium),
+                  const SizedBox(width: 4),
+                  Text('*', style: TextStyle(color: Colors.red, fontSize: 16)),
+                ],
+              ),
               const SizedBox(height: 12),
               DropdownButtonFormField<int>(
                 decoration: InputDecoration(
@@ -277,15 +386,17 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                 onChanged: (value) {
                   setState(() => _selectedWalletId = value);
                 },
-                validator: (value) {
-                  if (value == null) return l10n.getString('wallet_required');
-                  return null;
-                },
               ),
               const SizedBox(height: 24),
 
               // ============ المبلغ ============
-              Text(l10n.getString('amount'), style: theme.textTheme.titleMedium),
+              Row(
+                children: [
+                  Text(l10n.getString('amount'), style: theme.textTheme.titleMedium),
+                  const SizedBox(width: 4),
+                  Text('*', style: TextStyle(color: Colors.red, fontSize: 16)),
+                ],
+              ),
               const SizedBox(height: 12),
               TextFormField(
                 controller: _amountController,
@@ -296,16 +407,6 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                   prefixIcon: Icon(Icons.monetization_on),
                   suffixText: 'ريال',
                 ),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return l10n.getString('amount_required');
-                  }
-                  final amount = double.tryParse(value);
-                  if (amount == null || amount <= 0) {
-                    return l10n.getString('amount_positive');
-                  }
-                  return null;
-                },
               ),
               const SizedBox(height: 24),
 

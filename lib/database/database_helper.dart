@@ -26,27 +26,23 @@ class DatabaseHelper {
   }
 
   Future<void> _onCreate(Database db, int version) async {
-    // إنشاء جدول أنواع العمليات أولاً
-    try {
-      await db.execute('''
-        CREATE TABLE IF NOT EXISTS transaction_categories (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          name TEXT NOT NULL,
-          icon_name TEXT DEFAULT 'category',
-          is_active INTEGER DEFAULT 1,
-          sort_order INTEGER DEFAULT 0,
-          created_at TEXT DEFAULT CURRENT_TIMESTAMP
-        )
-      ''');
+    // ✅ إنشاء جدول أنواع العمليات
+    await db.execute('''
+      CREATE TABLE transaction_categories (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        icon_name TEXT DEFAULT 'category',
+        is_active INTEGER DEFAULT 1,
+        sort_order INTEGER DEFAULT 0,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP
+      )
+    ''');
 
-      // إضافة أنواع افتراضية
-      await db.insert('transaction_categories', {'name': 'سمبوسة', 'icon_name': 'fastfood', 'sort_order': 1});
-      await db.insert('transaction_categories', {'name': 'حلويات', 'icon_name': 'cake', 'sort_order': 2});
-    } catch (e) {
-      // تجاهل إذا كان الجدول موجوداً
-    }
+    // ✅ إضافة أنواع افتراضية (لكنها قابلة للتعديل والحذف)
+    await db.insert('transaction_categories', {'name': 'سمبوسة', 'icon_name': 'fastfood', 'sort_order': 1});
+    await db.insert('transaction_categories', {'name': 'حلويات', 'icon_name': 'cake', 'sort_order': 2});
 
-    // جدول المحافظ
+    // ✅ جدول المحافظ
     await db.execute('''
       CREATE TABLE wallets (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -56,7 +52,7 @@ class DatabaseHelper {
       )
     ''');
 
-    // جدول السجلات اليومية
+    // ✅ جدول السجلات اليومية
     await db.execute('''
       CREATE TABLE daily_records (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -68,7 +64,7 @@ class DatabaseHelper {
       )
     ''');
 
-    // جدول العمليات
+    // ✅ جدول العمليات
     await db.execute('''
       CREATE TABLE transactions (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -84,7 +80,7 @@ class DatabaseHelper {
       )
     ''');
 
-    // إضافة محافظ افتراضية
+    // ✅ إضافة محافظ افتراضية
     await db.insert('wallets', {'name': 'محفظة ١'});
     await db.insert('wallets', {'name': 'محفظة ٢'});
     await db.insert('wallets', {'name': 'محفظة ٣'});
@@ -101,7 +97,7 @@ class DatabaseHelper {
         await db.execute('ALTER TABLE daily_records ADD COLUMN is_archived INTEGER DEFAULT 0');
       } catch (e) {}
     }
-    // محاولة إنشاء جدول الفئات إذا لم يكن موجوداً
+    // ✅ محاولة إنشاء جدول الفئات إذا لم يكن موجوداً
     try {
       await db.execute('''
         CREATE TABLE IF NOT EXISTS transaction_categories (
@@ -113,7 +109,6 @@ class DatabaseHelper {
           created_at TEXT DEFAULT CURRENT_TIMESTAMP
         )
       ''');
-      // إضافة أنواع افتراضية إذا كانت فارغة
       final count = Sqflite.firstIntValue(
           await db.rawQuery('SELECT COUNT(*) FROM transaction_categories')) ?? 0;
       if (count == 0) {
@@ -125,7 +120,7 @@ class DatabaseHelper {
 
   // ============ TRANSACTION CATEGORIES ============
 
-  /// تحميل الفئات النشطة
+  /// ✅ تحميل الفئات النشطة (تظهر في شاشة الإضافة)
   Future<List<Map<String, dynamic>>> getActiveCategories() async {
     try {
       final db = await database;
@@ -136,7 +131,6 @@ class DatabaseHelper {
         orderBy: 'sort_order ASC',
       );
     } catch (e) {
-      // إذا كان الجدول غير موجود، أرجع قائمة افتراضية
       return [
         {'id': 1, 'name': 'سمبوسة', 'icon_name': 'fastfood', 'is_active': 1, 'sort_order': 1},
         {'id': 2, 'name': 'حلويات', 'icon_name': 'cake', 'is_active': 1, 'sort_order': 2},
@@ -144,7 +138,7 @@ class DatabaseHelper {
     }
   }
 
-  /// تحميل جميع الفئات (بما فيها المعطلة)
+  /// ✅ تحميل جميع الفئات (بما فيها المعطلة)
   Future<List<Map<String, dynamic>>> getAllCategories() async {
     try {
       final db = await database;
@@ -157,10 +151,9 @@ class DatabaseHelper {
     }
   }
 
-  /// إضافة فئة جديدة
+  /// ✅ إضافة فئة جديدة
   Future<int> addCategory(String name, {String iconName = 'category'}) async {
     final db = await database;
-    // إنشاء الجدول إذا لم يكن موجوداً
     try {
       await db.execute('''
         CREATE TABLE IF NOT EXISTS transaction_categories (
@@ -183,7 +176,7 @@ class DatabaseHelper {
     });
   }
 
-  /// تعديل فئة
+  /// ✅ تعديل فئة (يشمل السمبوسة والحلويات)
   Future<int> updateCategory(int id, String name, {String? iconName}) async {
     final db = await database;
     final updates = <String, dynamic>{'name': name};
@@ -196,7 +189,7 @@ class DatabaseHelper {
     );
   }
 
-  /// تعطيل/تفعيل فئة
+  /// ✅ تعطيل/تفعيل فئة
   Future<int> toggleCategoryStatus(int id, bool isActive) async {
     final db = await database;
     return await db.update(
@@ -207,10 +200,9 @@ class DatabaseHelper {
     );
   }
 
-  /// حذف/تعطيل فئة
+  /// ✅ حذف فئة (تعطيل فقط إذا كانت مستخدمة)
   Future<void> deleteCategory(int id) async {
     final db = await database;
-    // تعطيل بدل الحذف للحفاظ على العمليات القديمة
     await db.update(
       'transaction_categories',
       {'is_active': 0},
@@ -476,6 +468,7 @@ class DatabaseHelper {
 
   // ============ STATISTICS ============
 
+  /// ✅ إحصائيات يومية دقيقة - تعتمد على category مباشرة
   Future<Map<String, dynamic>> getDailyStatistics(String date) async {
     final db = await database;
 
@@ -488,15 +481,7 @@ class DatabaseHelper {
       WHERE d.business_date = ?
     ''', [date]);
 
-    final customStats = await db.rawQuery('''
-      SELECT t.custom_name, COALESCE(SUM(t.amount), 0) as total, COUNT(t.id) as count
-      FROM transactions t
-      INNER JOIN daily_records d ON t.daily_record_id = d.id
-      WHERE d.business_date = ? AND t.custom_name IS NOT NULL
-      GROUP BY t.custom_name
-      ORDER BY total DESC
-    ''', [date]);
-
+    // ✅ إحصائيات حسب الفئة (category) مباشرة
     final categoryStats = await db.rawQuery('''
       SELECT t.category as category_name, COALESCE(SUM(t.amount), 0) as total, COUNT(t.id) as count
       FROM transactions t
@@ -510,14 +495,12 @@ class DatabaseHelper {
       final data = <String, dynamic>{};
       data['total'] = result.first['total'] ?? 0;
       data['count'] = result.first['count'] ?? 0;
-      data['custom_stats'] = customStats;
       data['category_stats'] = categoryStats;
       return data;
     }
     return {
       'total': 0,
       'count': 0,
-      'custom_stats': <Map<String, dynamic>>[],
       'category_stats': <Map<String, dynamic>>[],
     };
   }
@@ -544,6 +527,7 @@ class DatabaseHelper {
         : {'total': 0, 'count': 0, 'days_count': 0};
   }
 
+  /// ✅ إحصائيات المحافظ - بدون تفصيل حسب الفئة (فقط الإجمالي والعدد)
   Future<List<Map<String, dynamic>>> getWalletStatistics(String date) async {
     final db = await database;
 
